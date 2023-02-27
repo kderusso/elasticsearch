@@ -11,82 +11,138 @@ import org.elasticsearch.action.ActionRequest;
 import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.action.ActionResponse;
 import org.elasticsearch.action.ActionType;
+import org.elasticsearch.action.IndicesRequest;
+import org.elasticsearch.action.support.IndicesOptions;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.xcontent.ToXContentObject;
 import org.elasticsearch.xcontent.XContentBuilder;
+import org.elasticsearch.xpack.entsearch.engine.Engine;
 
 import java.io.IOException;
+import java.util.Objects;
+
+import static org.elasticsearch.action.ValidateActions.addValidationError;
 
 public class GetEngineAction extends ActionType<GetEngineAction.Response> {
 
     public static final GetEngineAction INSTANCE = new GetEngineAction();
-    public static final String NAME = "cluster:admin/engine/get"; // TODO verify this
+    public static final String NAME = "indices:admin/engine/get";
 
     private GetEngineAction() {
         super(NAME, GetEngineAction.Response::new);
     }
 
-    public static class Request extends ActionRequest {
+    public static class Request extends ActionRequest implements IndicesRequest.Replaceable {
+
+        public static final IndicesOptions DEFAULT_INDICES_OPTIONS = IndicesOptions.strictExpandOpen();
+
+        private String[] names;
+        private final IndicesOptions indicesOptions = DEFAULT_INDICES_OPTIONS;
 
         private final String engineId;
 
         public Request(StreamInput in) throws IOException {
             super(in);
             this.engineId = in.readString();
-        }
-
-        @Override
-        public ActionRequestValidationException validate() {
-            return null;
+            names = new String[] { Engine.getEngineAliasName(this.engineId) };
         }
 
         public Request(String engineId) {
             this.engineId = engineId;
+            names = new String[] { Engine.getEngineAliasName(this.engineId) };
+        }
+
+        @Override
+        public ActionRequestValidationException validate() {
+            ActionRequestValidationException validationException = null;
+
+            if (engineId == null || engineId.isEmpty()) {
+                validationException = addValidationError("engineId missing", validationException);
+            }
+
+            return validationException;
         }
 
         public String getEngineId() {
             return engineId;
         }
+
+        @Override
+        public void writeTo(StreamOutput out) throws IOException {
+            super.writeTo(out);
+            out.writeString(engineId);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Request request = (Request) o;
+            return Objects.equals(engineId, request.engineId);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(engineId);
+        }
+
+        @Override
+        public IndicesRequest indices(String... indices) {
+            this.names = indices;
+            return this;
+        }
+
+        @Override
+        public String[] indices() {
+            return names;
+        }
+
+        @Override
+        public IndicesOptions indicesOptions() {
+            return indicesOptions;
+        }
     }
 
-    // TODO add CreatedAt, UpdatedAt
     public static class Response extends ActionResponse implements ToXContentObject {
 
-        private final String engineId;
-        private final String[] indices;
-        private final String analyticsCollectionName; // TODO should this be optional?
-
+        private final Engine engine;
 
         public Response(StreamInput in) throws IOException {
             super(in);
-            this.engineId = in.readString();
-            this.indices = in.readStringArray();
-            this.analyticsCollectionName = in.readString(); // TODO: Check this is needed
+            this.engine = new Engine(in);
         }
 
-        public Response(String engineId, String[] indices, String analyticsCollectionName) {
-            this.engineId = engineId;
-            this.indices = indices;
-            this.analyticsCollectionName = analyticsCollectionName;
+        public Response(Engine engine) {
+            this.engine = engine;
+        }
+
+        public Response(String engineId, String[] indices, String analyticsCollectionName, long updatedAtMillis) {
+            this.engine = new Engine(engineId, indices, analyticsCollectionName);
+            this.engine.setUpdatedAtMillis(updatedAtMillis);
         }
 
         @Override
         public void writeTo(StreamOutput out) throws IOException {
-            out.writeString(engineId);
-            out.writeStringArray(indices);
-            out.writeString(analyticsCollectionName);
+            engine.writeTo(out);
         }
 
         @Override
         public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
-            builder.startObject();
-            builder.field("engine_id", this.engineId);
-            builder.array("indices", this.indices);
-            builder.field("analytics_collection_name", this.analyticsCollectionName);
-            builder.endObject();
-            return builder;
+            return engine.toXContent(builder, params);
         }
 
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Response response = (Response) o;
+            return Objects.equals(engine, response.engine);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(engine);
+        }
     }
 }
