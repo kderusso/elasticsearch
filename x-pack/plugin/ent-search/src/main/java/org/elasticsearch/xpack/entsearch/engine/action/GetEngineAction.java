@@ -118,8 +118,7 @@ public class GetEngineAction extends ActionType<GetEngineAction.Response> {
         }
 
         public Response(String engineId, String[] indices, String analyticsCollectionName, long updatedAtMillis) {
-            this.engine = new Engine(engineId, indices, analyticsCollectionName);
-            this.engine.setUpdatedAtMillis(updatedAtMillis);
+            this.engine = new Engine(engineId, indices, analyticsCollectionName, updatedAtMillis);
         }
 
         @Override

@@ -140,6 +140,7 @@ public class EngineTests extends ESTestCase {
             indices[i] = randomAlphaOfLengthBetween(10, 20);
         }
         String analyticsCollectionName = randomBoolean() ? randomAlphaOfLengthBetween(10, 15) : null;
-        return new Engine(name, indices, analyticsCollectionName);
+        final Long updatedAtMillis = randomFrom(new Long[] { null, randomNonNegativeLong() });
+        return new Engine(name, indices, analyticsCollectionName, updatedAtMillis);
     }
 }

@@ -43,26 +43,24 @@ public class Engine implements Writeable, ToXContentObject {
     public static final String ENGINE_ALIAS_PREFIX = "engine-";
     private final String name;
     private final String[] indices;
-    private long updatedAtMillis = System.currentTimeMillis();
+    private static final ConstructingObjectParser<Engine, String> PARSER = new ConstructingObjectParser<>(
+        "engine",
+        false,
+        (params, engineName) -> {
+            @SuppressWarnings("unchecked")
+            final String[] indices = ((List<String>) params[0]).toArray(String[]::new);
+            final String analyticsCollectionName = (String) params[1];
+            final Long maybeUpdatedAtMillis = (Long) params[2];
+            long updatedAtMillis = (maybeUpdatedAtMillis != null ? maybeUpdatedAtMillis : System.currentTimeMillis());
+
+            Engine newEngine = new Engine(engineName, indices, analyticsCollectionName, updatedAtMillis);
+            return newEngine;
+        }
+    );
     private final String analyticsCollectionName;
 
     private final String engineAlias;
-
-    /**
-     * Public constructor.
-     *
-     * @param name                    The name of the engine.
-     * @param indices                 The list of indices targeted by this engine.
-     * @param analyticsCollectionName The name of the associated analytics collection.
-     */
-    public Engine(String name, String[] indices, @Nullable String analyticsCollectionName) {
-        this.name = name;
-        this.indices = indices;
-        Arrays.sort(indices);
-
-        this.analyticsCollectionName = analyticsCollectionName;
-        this.engineAlias = getEngineAliasName(name);
-    }
+    private final long updatedAtMillis;
 
     public Engine(StreamInput in) throws IOException {
         this.name = in.readString();
@@ -85,21 +83,23 @@ public class Engine implements Writeable, ToXContentObject {
         out.writeLong(updatedAtMillis);
     }
 
-    private static final ConstructingObjectParser<Engine, String> PARSER = new ConstructingObjectParser<>(
-        "engine",
-        false,
-        (params, engineName) -> {
-            @SuppressWarnings("unchecked")
-            final String[] indices = ((List<String>) params[0]).toArray(String[]::new);
-            final String analyticsCollectionName = (String) params[1];
-            final Long maybeUpdatedAtMillis = (Long) params[2];
-            long updatedAtMillis = (maybeUpdatedAtMillis != null ? maybeUpdatedAtMillis : System.currentTimeMillis());
+    /**
+     * Public constructor.
+     *
+     * @param name                    The name of the engine.
+     * @param indices                 The list of indices targeted by this engine.
+     * @param analyticsCollectionName The name of the associated analytics collection.
+     * @param updatedAtMillis
+     */
+    public Engine(String name, String[] indices, @Nullable String analyticsCollectionName, @Nullable Long updatedAtMillis) {
+        this.name = name;
+        this.indices = indices;
+        Arrays.sort(indices);
 
-            Engine newEngine = new Engine(engineName, indices, analyticsCollectionName);
-            newEngine.setUpdatedAtMillis(updatedAtMillis);
-            return newEngine;
-        }
-    );
+        this.analyticsCollectionName = analyticsCollectionName;
+        this.engineAlias = getEngineAliasName(name);
+        this.updatedAtMillis = Objects.requireNonNullElse(updatedAtMillis, System.currentTimeMillis());
+    }
 
     public static final ParseField NAME_FIELD = new ParseField("name");
     public static final ParseField INDICES_FIELD = new ParseField("indices");
@@ -191,10 +191,6 @@ public class Engine implements Writeable, ToXContentObject {
 
     public long updatedAtMillis() {
         return updatedAtMillis;
-    }
-
-    public void setUpdatedAtMillis(long updatedAtMillis) {
-        this.updatedAtMillis = updatedAtMillis;
     }
 
     public String engineAlias() {
