@@ -46,6 +46,7 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.common.xcontent.XContentHelper;
 import org.elasticsearch.common.xcontent.XContentParserUtils;
+import org.elasticsearch.core.CheckedFunction;
 import org.elasticsearch.core.Streams;
 import org.elasticsearch.index.Index;
 import org.elasticsearch.index.IndexNotFoundException;
@@ -74,7 +75,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 import static org.elasticsearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
@@ -186,14 +186,12 @@ public class SearchApplicationIndexService {
      */
     public void getSearchApplication(String resourceName, ActionListener<SearchApplication> listener) {
         final GetRequest getRequest = new GetRequest(SEARCH_APPLICATION_ALIAS_NAME).id(resourceName).realtime(true);
-        clientWithOrigin.get(getRequest, new DelegatingIndexNotFoundActionListener<>(resourceName, listener, (l, getResponse) -> {
-            if (getResponse.isExists() == false) {
-                l.onFailure(new ResourceNotFoundException(resourceName));
-                return;
+        clientWithOrigin.get(getRequest, new DelegatingIndexNotFoundActionListener<>(resourceName, listener, getResponse -> {
+            if (getResponse.isExists()) {
+                return parseSearchApplicationBinaryFromSource(getResponse.getSourceInternal());
+            } else {
+                throw new ResourceNotFoundException(resourceName);
             }
-            final BytesReference source = getResponse.getSourceInternal();
-            final SearchApplication res = parseSearchApplicationBinaryFromSource(source);
-            l.onResponse(res);
         }));
     }
 
@@ -294,16 +292,13 @@ public class SearchApplicationIndexService {
         try {
             final DeleteRequest deleteRequest = new DeleteRequest(SEARCH_APPLICATION_ALIAS_NAME).id(resourceName)
                 .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
-            clientWithOrigin.delete(
-                deleteRequest,
-                new DelegatingIndexNotFoundActionListener<>(resourceName, listener, (l, deleteResponse) -> {
-                    if (deleteResponse.getResult() == DocWriteResponse.Result.NOT_FOUND) {
-                        l.onFailure(new ResourceNotFoundException(resourceName));
-                        return;
-                    }
-                    l.onResponse(deleteResponse);
-                })
-            );
+            clientWithOrigin.delete(deleteRequest, new DelegatingIndexNotFoundActionListener<>(resourceName, listener, deleteResponse -> {
+                if (deleteResponse.getResult() == DocWriteResponse.Result.NOT_FOUND) {
+                    throw new ResourceNotFoundException(resourceName);
+                } else {
+                    return deleteResponse;
+                }
+            }));
         } catch (Exception e) {
             listener.onFailure(e);
         }
@@ -322,11 +317,7 @@ public class SearchApplicationIndexService {
             .indices()
             .aliases(
                 aliasesRequest,
-                new DelegatingIndexNotFoundActionListener<>(
-                    searchAliasName,
-                    listener,
-                    (l, acknowledgedResponse) -> l.onResponse(AcknowledgedResponse.TRUE)
-                )
+                new DelegatingIndexNotFoundActionListener<>(searchAliasName, listener, ignored -> AcknowledgedResponse.TRUE)
             );
     }
 
@@ -464,18 +455,18 @@ public class SearchApplicationIndexService {
 
     static class DelegatingIndexNotFoundActionListener<T, R> extends ActionListener.Delegating<T, R> {
 
-        private final BiConsumer<ActionListener<R>, T> bc;
+        private final CheckedFunction<T, R, Exception> fn;
         private final String resourceName;
 
-        DelegatingIndexNotFoundActionListener(String resourceName, ActionListener<R> delegate, BiConsumer<ActionListener<R>, T> bc) {
+        DelegatingIndexNotFoundActionListener(String resourceName, ActionListener<R> delegate, CheckedFunction<T, R, Exception> fn) {
             super(delegate);
-            this.bc = bc;
+            this.fn = fn;
             this.resourceName = resourceName;
         }
 
         @Override
         public void onResponse(T t) {
-            bc.accept(delegate, t);
+            ActionListener.completeWith(delegate, () -> fn.apply(t));
         }
 
         @Override
