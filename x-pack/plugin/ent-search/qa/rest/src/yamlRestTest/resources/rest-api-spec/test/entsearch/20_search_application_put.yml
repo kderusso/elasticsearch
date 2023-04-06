@@ -205,3 +205,12 @@ teardown:
                   total += doc['goals'][i];
                 }
                 return total;
+---
+"Create Search Application - Script missing from template":
+  - do:
+      catch: bad_request
+      search_application.put:
+        name: test-search-application-with-invalid-template
+        body:
+          indices: [ "test-index1" ]
+          template:
