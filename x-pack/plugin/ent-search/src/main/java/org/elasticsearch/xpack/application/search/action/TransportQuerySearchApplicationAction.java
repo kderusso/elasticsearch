@@ -16,39 +16,24 @@ import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.ActionFilters;
 import org.elasticsearch.client.internal.Client;
 import org.elasticsearch.cluster.service.ClusterService;
-import org.elasticsearch.common.ValidationException;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.io.stream.NamedWriteableRegistry;
 import org.elasticsearch.common.util.BigArrays;
-import org.elasticsearch.common.xcontent.LoggingDeprecationHandler;
 import org.elasticsearch.license.XPackLicenseState;
-import org.elasticsearch.script.Script;
 import org.elasticsearch.script.ScriptService;
-import org.elasticsearch.script.TemplateScript;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.transport.TransportService;
 import org.elasticsearch.xcontent.NamedXContentRegistry;
-import org.elasticsearch.xcontent.XContentFactory;
-import org.elasticsearch.xcontent.XContentParser;
-import org.elasticsearch.xcontent.XContentParserConfiguration;
-import org.elasticsearch.xcontent.XContentType;
-import org.elasticsearch.xpack.application.search.SearchApplication;
-import org.elasticsearch.xpack.application.search.SearchApplicationTemplate;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import org.elasticsearch.xpack.application.search.SearchApplicationTemplateService;
 
 public class TransportQuerySearchApplicationAction extends SearchApplicationTransportAction<
-    QuerySearchApplicationAction.Request,
+    SearchApplicationSearchRequest,
     SearchResponse> {
 
     private static final Logger logger = LogManager.getLogger(TransportQuerySearchApplicationAction.class);
 
     private final Client client;
-    private final ScriptService scriptService;
-
-    private final NamedXContentRegistry xContentRegistry;
+    private final SearchApplicationTemplateService templateService;
 
     @Inject
     public TransportQuerySearchApplicationAction(
@@ -66,7 +51,7 @@ public class TransportQuerySearchApplicationAction extends SearchApplicationTran
             QuerySearchApplicationAction.NAME,
             transportService,
             actionFilters,
-            QuerySearchApplicationAction.Request::new,
+            SearchApplicationSearchRequest::new,
             client,
             clusterService,
             namedWriteableRegistry,
@@ -74,15 +59,14 @@ public class TransportQuerySearchApplicationAction extends SearchApplicationTran
             licenseState
         );
         this.client = client;
-        this.scriptService = scriptService;
-        this.xContentRegistry = xContentRegistry;
+        this.templateService = new SearchApplicationTemplateService(scriptService, xContentRegistry);
     }
 
     @Override
-    protected void doExecute(QuerySearchApplicationAction.Request request, ActionListener<SearchResponse> listener) {
+    protected void doExecute(SearchApplicationSearchRequest request, ActionListener<SearchResponse> listener) {
         systemIndexService.getSearchApplication(request.name(), listener.delegateFailure((l, searchApplication) -> {
             try {
-                final SearchSourceBuilder sourceBuilder = renderTemplate(searchApplication, request);
+                final SearchSourceBuilder sourceBuilder = templateService.renderTemplate(searchApplication, request);
                 SearchRequest searchRequest = new SearchRequest(searchApplication.indices()).source(sourceBuilder);
 
                 client.execute(
@@ -94,34 +78,5 @@ public class TransportQuerySearchApplicationAction extends SearchApplicationTran
                 listener.onFailure(e);
             }
         }));
-    }
-
-    private static Map<String, Object> mergeTemplateParams(QuerySearchApplicationAction.Request request, Script script) {
-        Map<String, Object> mergedTemplateParams = new HashMap<>(script.getParams());
-        mergedTemplateParams.putAll(request.queryParams());
-
-        return mergedTemplateParams;
-    }
-
-    private SearchSourceBuilder renderTemplate(SearchApplication searchApplication, QuerySearchApplicationAction.Request request)
-        throws IOException, ValidationException {
-
-        final SearchApplicationTemplate template = searchApplication.searchApplicationTemplate();
-        final Map<String, Object> queryParams = request.queryParams();
-        final Script script = template.script();
-
-        template.validateTemplateParams(queryParams);
-
-        TemplateScript compiledTemplate = scriptService.compile(script, TemplateScript.CONTEXT)
-            .newInstance(mergeTemplateParams(request, script));
-        String requestSource = compiledTemplate.execute();
-
-        XContentParserConfiguration parserConfig = XContentParserConfiguration.EMPTY.withRegistry(xContentRegistry)
-            .withDeprecationHandler(LoggingDeprecationHandler.INSTANCE);
-        try (XContentParser parser = XContentFactory.xContent(XContentType.JSON).createParser(parserConfig, requestSource)) {
-            SearchSourceBuilder builder = SearchSourceBuilder.searchSource();
-            builder.parseXContent(parser, false);
-            return builder;
-        }
     }
 }

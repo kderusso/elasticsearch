@@ -13,24 +13,23 @@ import org.elasticsearch.xpack.application.search.SearchApplicationTestUtils;
 
 import java.io.IOException;
 
-public class RenderMetadataRequestSerializingTests extends AbstractWireSerializingTestCase<
-    RenderMetadataAction.Request> {
+public class SearchApplicationSearchRequestSerializingTests extends AbstractWireSerializingTestCase<SearchApplicationSearchRequest> {
 
     @Override
-    protected Writeable.Reader<RenderMetadataAction.Request> instanceReader() {
-        return RenderMetadataAction.Request::new;
+    protected Writeable.Reader<SearchApplicationSearchRequest> instanceReader() {
+        return SearchApplicationSearchRequest::new;
     }
 
     @Override
-    protected RenderMetadataAction.Request createTestInstance() {
-        return new RenderMetadataAction.Request(
+    protected SearchApplicationSearchRequest createTestInstance() {
+        return new SearchApplicationSearchRequest(
             randomAlphaOfLengthBetween(1, 10),
             SearchApplicationTestUtils.randomSearchApplicationQueryParams()
         );
     }
 
     @Override
-    protected RenderMetadataAction.Request mutateInstance(RenderMetadataAction.Request instance) throws IOException {
+    protected SearchApplicationSearchRequest mutateInstance(SearchApplicationSearchRequest instance) throws IOException {
         return randomValueOtherThan(instance, this::createTestInstance);
     }
 

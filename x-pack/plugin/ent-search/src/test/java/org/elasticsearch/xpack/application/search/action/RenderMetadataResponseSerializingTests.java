@@ -15,8 +15,7 @@ import java.util.Collections;
 
 import static org.elasticsearch.search.RandomSearchRequestGenerator.randomSearchSourceBuilder;
 
-public class RenderMetadataResponseSerializingTests extends AbstractWireSerializingTestCase<
-    RenderMetadataAction.Response> {
+public class RenderMetadataResponseSerializingTests extends AbstractWireSerializingTestCase<RenderMetadataAction.Response> {
 
     @Override
     protected Writeable.Reader<RenderMetadataAction.Response> instanceReader() {
@@ -25,19 +24,13 @@ public class RenderMetadataResponseSerializingTests extends AbstractWireSerializ
 
     @Override
     protected RenderMetadataAction.Response createTestInstance() {
-        return new RenderMetadataAction.Response(randomSearchSourceBuilder(
-            () -> null,
-            () -> null,
-            () -> null,
-            Collections::emptyList,
-            () -> null,
-            () -> null
-        ));
+        return new RenderMetadataAction.Response(
+            randomSearchSourceBuilder(() -> null, () -> null, () -> null, Collections::emptyList, () -> null, () -> null)
+        );
     }
 
     @Override
     protected RenderMetadataAction.Response mutateInstance(RenderMetadataAction.Response instance) throws IOException {
         return randomValueOtherThan(instance, this::createTestInstance);
     }
-
 }
