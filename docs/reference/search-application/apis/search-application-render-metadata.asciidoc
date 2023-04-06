@@ -1,0 +1,78 @@
+[role="xpack"]
+[[search-application-render-metadata]]
+=== Render Search Application Metadata
+
+beta::[]
+
+++++
+<titleabbrev>Render Search Application Metadata</titleabbrev>
+++++
+
+Given query parameters, merges those query parameters with the template associated with the search application,
+returning a rendered template result.
+
+[[search-application-render-metadata-request]]
+==== {api-request-title}
+
+`POST _application/search_application/<name>/_render_metadata`
+
+[[search-application-render-metadata-prereqs]]
+==== {api-prereq-title}
+
+Requires the `manage_search_application` cluster privilege.
+
+[[search-application-render-metadata-request-body]]
+==== {api-request-body-title}
+
+`params`::
+(Required, map of strings to objects)
+Query parameters specific to this request, which will override any defaults specified in the template.
+
+[[search-application-render-metadata-response-codes]]
+==== {api-response-codes-title}
+
+`404`::
+Search Application `<name>` does not exist.
+
+[[search-application-render-metadata-example]]
+==== {api-examples-title}
+
+The following example renders metadata for a Search Application called `my-app`:
+
+[source,console]
+----
+POST _application/search_application/my-app/_render_metadata
+{
+  "params": {
+    "value": "my first query",
+    "from": 10
+  }
+}
+----
+// TEST[skip:TBD]
+
+A sample response:
+
+[source,console-result]
+----
+{
+    "query": {
+        "value": "my first query",
+        "size": 10,
+        "from": 10,
+        "text_fields": [
+            {
+                "name": "title",
+                "boost": 10
+            },
+            {
+                "name": "text",
+                "boost": 1
+            }
+        ]
+    }
+}
+----
+
+
+
