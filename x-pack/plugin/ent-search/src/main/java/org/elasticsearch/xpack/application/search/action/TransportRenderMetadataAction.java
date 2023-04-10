@@ -18,6 +18,7 @@ import org.elasticsearch.common.io.stream.NamedWriteableRegistry;
 import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.license.XPackLicenseState;
 import org.elasticsearch.script.ScriptService;
+import org.elasticsearch.script.TemplateScript;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.transport.TransportService;
 import org.elasticsearch.xcontent.NamedXContentRegistry;
@@ -61,8 +62,8 @@ public class TransportRenderMetadataAction extends SearchApplicationTransportAct
     protected void doExecute(SearchApplicationSearchRequest request, ActionListener<RenderMetadataAction.Response> listener) {
         systemIndexService.getSearchApplication(request.name(), listener.delegateFailure((l, searchApplication) -> {
             try {
-                final SearchSourceBuilder sourceBuilder = templateService.renderTemplate(searchApplication, request);
-                listener.onResponse(new RenderMetadataAction.Response(sourceBuilder));
+                final String renderedTemplate = templateService.renderTemplate(searchApplication, request);
+                listener.onResponse(new RenderMetadataAction.Response(renderedTemplate));
             } catch (Exception e) {
                 listener.onFailure(e);
             }

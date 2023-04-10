@@ -10,9 +10,6 @@ package org.elasticsearch.xpack.application.search.action;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.elasticsearch.action.ActionListener;
-import org.elasticsearch.action.search.SearchAction;
-import org.elasticsearch.action.search.SearchRequest;
-import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.ActionFilters;
 import org.elasticsearch.client.internal.Client;
 import org.elasticsearch.cluster.service.ClusterService;
@@ -26,58 +23,50 @@ import org.elasticsearch.transport.TransportService;
 import org.elasticsearch.xcontent.NamedXContentRegistry;
 import org.elasticsearch.xpack.application.search.SearchApplicationTemplateService;
 
-public class TransportQuerySearchApplicationAction extends SearchApplicationTransportAction<
-    SearchApplicationSearchRequest,
-    SearchResponse> {
+public class TransportRenderQueryAction extends SearchApplicationTransportAction<
+    RenderQueryAction.Request,
+    RenderQueryAction.Response> {
 
-    private static final Logger logger = LogManager.getLogger(TransportQuerySearchApplicationAction.class);
+    private static final Logger logger = LogManager.getLogger(TransportRenderQueryAction.class);
 
-    private final Client client;
     private final SearchApplicationTemplateService templateService;
 
     @Inject
-    public TransportQuerySearchApplicationAction(
+    public TransportRenderQueryAction(
         TransportService transportService,
         ActionFilters actionFilters,
         Client client,
         ClusterService clusterService,
         NamedWriteableRegistry namedWriteableRegistry,
-        NamedXContentRegistry xContentRegistry,
         BigArrays bigArrays,
+        XPackLicenseState licenseState,
         ScriptService scriptService,
-        XPackLicenseState licenseState
+        NamedXContentRegistry xContentRegistry
     ) {
         super(
-            QuerySearchApplicationAction.NAME,
+            RenderQueryAction.NAME,
             transportService,
             actionFilters,
-            SearchApplicationSearchRequest::new,
+            RenderQueryAction.Request::new,
             client,
             clusterService,
             namedWriteableRegistry,
             bigArrays,
             licenseState
         );
-        this.client = client;
         this.templateService = new SearchApplicationTemplateService(scriptService, xContentRegistry);
     }
 
     @Override
-    protected void doExecute(SearchApplicationSearchRequest request, ActionListener<SearchResponse> listener) {
+    protected void doExecute(RenderQueryAction.Request request, ActionListener<RenderQueryAction.Response> listener) {
         systemIndexService.getSearchApplication(request.name(), listener.delegateFailure((l, searchApplication) -> {
             try {
-                final String renderedTemplate = templateService.renderTemplate(searchApplication, request);
-                final SearchSourceBuilder sourceBuilder = templateService.renderQuery(searchApplication, renderedTemplate);
-                SearchRequest searchRequest = new SearchRequest(searchApplication.indices()).source(sourceBuilder);
-
-                client.execute(
-                    SearchAction.INSTANCE,
-                    searchRequest,
-                    listener.delegateFailure((l2, searchResponse) -> l2.onResponse(searchResponse))
-                );
+                final SearchSourceBuilder sourceBuilder = templateService.renderQuery(searchApplication, request.renderedTemplate());
+                listener.onResponse(new RenderQueryAction.Response(sourceBuilder));
             } catch (Exception e) {
                 listener.onFailure(e);
             }
         }));
     }
+
 }

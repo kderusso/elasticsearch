@@ -26,8 +26,8 @@ import java.util.Map;
 
 public class SearchApplicationTemplateService {
 
-    private ScriptService scriptService;
-    private NamedXContentRegistry xContentRegistry;
+    private final ScriptService scriptService;
+    private final NamedXContentRegistry xContentRegistry;
 
     public SearchApplicationTemplateService(ScriptService scriptService, NamedXContentRegistry xContentRegistry) {
         this.scriptService = scriptService;
@@ -35,34 +35,52 @@ public class SearchApplicationTemplateService {
     }
 
     /**
-     * Renders the search application's associated template with the provided request parameters.
+     * Renders the query based on the compiled template
      *
      * @param searchApplication
-     * @param request
+     * @param renderedTemplate
      * @return SearchSourceBuilder
      * @throws IOException
      * @throws ValidationException
      */
-    public SearchSourceBuilder renderTemplate(SearchApplication searchApplication, SearchApplicationSearchRequest request)
+    public SearchSourceBuilder renderQuery(SearchApplication searchApplication, String renderedTemplate)
         throws IOException, ValidationException {
+        XContentParserConfiguration parserConfig = XContentParserConfiguration.EMPTY.withRegistry(xContentRegistry)
+            .withDeprecationHandler(LoggingDeprecationHandler.INSTANCE);
+        try (XContentParser parser = XContentFactory.xContent(XContentType.JSON).createParser(parserConfig, renderedTemplate)) {
+            SearchSourceBuilder builder = SearchSourceBuilder.searchSource();
+            builder.parseXContent(parser, false);
+            return builder;
+        }
+    }
+
+    /**
+     * Renders the search application's associated template with the provided request parameters.
+     *
+     * @param searchApplication
+     * @param request
+     * @return
+     * @throws ValidationException
+     */
+    public String renderTemplate(SearchApplication searchApplication, SearchApplicationSearchRequest request)
+        throws ValidationException {
+
+        StringBuilder sb = new StringBuilder();
 
         final SearchApplicationTemplate template = searchApplication.searchApplicationTemplate();
         final Map<String, Object> queryParams = request.queryParams();
         final Script script = template.script();
+        sb.append(script.toString());
+        sb.append("\n\n");
 
         template.validateTemplateParams(queryParams);
 
         TemplateScript compiledTemplate = scriptService.compile(script, TemplateScript.CONTEXT)
             .newInstance(mergeTemplateParams(request, script));
-        String requestSource = compiledTemplate.execute();
-
-        XContentParserConfiguration parserConfig = XContentParserConfiguration.EMPTY.withRegistry(xContentRegistry)
-            .withDeprecationHandler(LoggingDeprecationHandler.INSTANCE);
-        try (XContentParser parser = XContentFactory.xContent(XContentType.JSON).createParser(parserConfig, requestSource)) {
-            SearchSourceBuilder builder = SearchSourceBuilder.searchSource();
-            builder.parseXContent(parser, false);
-            return builder;
-        }
+        sb.append(compiledTemplate.toString());
+        sb.append("\n\n");
+//        return compiledTemplate.execute();
+        return sb.toString(); // TODO make this response correct 
     }
 
     private static Map<String, Object> mergeTemplateParams(SearchApplicationSearchRequest request, Script script) {

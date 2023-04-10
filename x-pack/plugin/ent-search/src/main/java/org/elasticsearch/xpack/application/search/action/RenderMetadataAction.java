@@ -11,6 +11,7 @@ import org.elasticsearch.action.ActionResponse;
 import org.elasticsearch.action.ActionType;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
+import org.elasticsearch.script.TemplateScript;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.xcontent.ParseField;
 import org.elasticsearch.xcontent.ToXContentObject;
@@ -32,25 +33,28 @@ public class RenderMetadataAction extends ActionType<RenderMetadataAction.Respon
 
     public static class Response extends ActionResponse implements ToXContentObject {
 
-        private final SearchSourceBuilder searchSourceBuilder;
+        private final String renderedTemplate;
 
         public Response(StreamInput in) throws IOException {
             super(in);
-            this.searchSourceBuilder = new SearchSourceBuilder(in);
+            this.renderedTemplate = in.readString();
         }
 
-        public Response(SearchSourceBuilder searchSourceBuilder) {
-            this.searchSourceBuilder = searchSourceBuilder;
+        public Response(String renderedTemplate) {
+            this.renderedTemplate = renderedTemplate;
         }
 
         @Override
         public void writeTo(StreamOutput out) throws IOException {
-            searchSourceBuilder.writeTo(out);
+            out.writeString(renderedTemplate);
         }
 
         @Override
         public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
-            return searchSourceBuilder.toXContent(builder, params);
+            builder.startObject();
+            builder.field("renderedTemplate", this.renderedTemplate);
+            builder.endObject();
+            return builder;
         }
 
         @Override
@@ -58,12 +62,12 @@ public class RenderMetadataAction extends ActionType<RenderMetadataAction.Respon
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Response response = (Response) o;
-            return searchSourceBuilder.equals(response.searchSourceBuilder);
+            return renderedTemplate.equals(response.renderedTemplate);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(searchSourceBuilder);
+            return Objects.hash(renderedTemplate);
         }
     }
 }
