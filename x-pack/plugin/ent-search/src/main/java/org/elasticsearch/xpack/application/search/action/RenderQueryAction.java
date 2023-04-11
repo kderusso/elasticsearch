@@ -43,7 +43,7 @@ public class RenderQueryAction extends ActionType<RenderQueryAction.Response> {
         private final Map<String, Object> renderedTemplateParams;
 
         private static final ConstructingObjectParser<Request, String> PARSER = new ConstructingObjectParser<>(
-            QUERY_PARAMS_FIELD,
+            "params",
             false,
             (params, searchAppName) -> {
                 @SuppressWarnings("unchecked")
