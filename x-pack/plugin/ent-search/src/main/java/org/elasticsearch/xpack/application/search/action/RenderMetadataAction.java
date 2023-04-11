@@ -43,7 +43,7 @@ public class RenderMetadataAction extends ActionType<RenderMetadataAction.Respon
         public Response(Map<String,Object> renderedTemplateParams) {
             this.renderedTemplateParams = renderedTemplateParams;
         }
-        
+
         @Override
         public void writeTo(StreamOutput out) throws IOException {
             out.writeGenericMap(renderedTemplateParams);
@@ -52,7 +52,7 @@ public class RenderMetadataAction extends ActionType<RenderMetadataAction.Respon
         @Override
         public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
             builder.startObject();
-            builder.field("params", Collections.singleton(this.renderedTemplateParams));
+            builder.field("params", this.renderedTemplateParams);
             builder.endObject();
             return builder;
         }
