@@ -14,13 +14,18 @@ import org.elasticsearch.action.ActionType;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.xcontent.ConstructingObjectParser;
+import org.elasticsearch.xcontent.ParseField;
 import org.elasticsearch.xcontent.ToXContentObject;
 import org.elasticsearch.xcontent.XContentBuilder;
+import org.elasticsearch.xcontent.XContentParser;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.Objects;
 
 import static org.elasticsearch.action.ValidateActions.addValidationError;
+import static org.elasticsearch.xcontent.ConstructingObjectParser.constructorArg;
 
 public class RenderQueryAction extends ActionType<RenderQueryAction.Response> {
 
@@ -33,18 +38,33 @@ public class RenderQueryAction extends ActionType<RenderQueryAction.Response> {
 
     public static class Request extends ActionRequest {
 
+        private static final ParseField QUERY_PARAMS_FIELD = new ParseField("params");
         private final String name;
-        private final String renderedTemplate;
+        private final Map<String,Object> renderedTemplateParams;
+
+        private static final ConstructingObjectParser<Request, String> PARSER = new ConstructingObjectParser<>(
+            "params",
+            false,
+            (params, searchAppName) -> {
+                @SuppressWarnings("unchecked")
+                final Map<String, Object> queryParams = (Map<String, Object>) params[0];
+                return new Request(searchAppName, queryParams);
+            }
+        );
+
+        static {
+            PARSER.declareObject(constructorArg(), (p, c) -> p.map(), QUERY_PARAMS_FIELD);
+        }
 
         public Request(StreamInput in) throws IOException {
             super(in);
             this.name = in.readString();
-            this.renderedTemplate = in.readString();
+            this.renderedTemplateParams = in.readMap();
         }
 
-        public Request(String name, String renderedTemplate) {
+        public Request(String name, Map<String,Object> renderedTemplateParams) {
             this.name = name;
-            this.renderedTemplate = renderedTemplate;
+            this.renderedTemplateParams = renderedTemplateParams;
         }
 
         @Override
@@ -55,8 +75,8 @@ public class RenderQueryAction extends ActionType<RenderQueryAction.Response> {
                 validationException = addValidationError("name is required", validationException);
             }
 
-            if (renderedTemplate == null || renderedTemplate.isEmpty()) {
-                validationException = addValidationError("renderedTemplate is required", validationException);
+            if (renderedTemplateParams == null || renderedTemplateParams.isEmpty()) {
+                validationException = addValidationError("params is required", validationException);
             }
             return validationException;
         }
@@ -65,22 +85,26 @@ public class RenderQueryAction extends ActionType<RenderQueryAction.Response> {
         public void writeTo(StreamOutput out) throws IOException {
             super.writeTo(out);
             out.writeString(name);
-            out.writeString(renderedTemplate);
+            out.writeGenericMap(renderedTemplateParams);
+        }
+
+        public static Request fromXContent(String name, XContentParser contentParser) {
+            return PARSER.apply(contentParser, name);
         }
 
         public String name() { return name; }
-        public String renderedTemplate() { return renderedTemplate; }
+        public Map<String,Object> renderedTemplateParams() { return renderedTemplateParams; }
 
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Request request = (Request) o;
-            return renderedTemplate.equals(request.renderedTemplate) && name.equals(request.name);
+            return renderedTemplateParams.equals(request.renderedTemplateParams) && name.equals(request.name);
         }
 
         @Override
-        public int hashCode() { return Objects.hash(renderedTemplate, name); }
+        public int hashCode() { return Objects.hash(renderedTemplateParams, name); }
     }
 
     public static class Response extends ActionResponse implements ToXContentObject {

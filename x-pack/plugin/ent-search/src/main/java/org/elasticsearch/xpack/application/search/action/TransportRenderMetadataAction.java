@@ -24,6 +24,8 @@ import org.elasticsearch.transport.TransportService;
 import org.elasticsearch.xcontent.NamedXContentRegistry;
 import org.elasticsearch.xpack.application.search.SearchApplicationTemplateService;
 
+import java.util.Map;
+
 public class TransportRenderMetadataAction extends SearchApplicationTransportAction<
     SearchApplicationSearchRequest,
     RenderMetadataAction.Response> {
@@ -62,8 +64,8 @@ public class TransportRenderMetadataAction extends SearchApplicationTransportAct
     protected void doExecute(SearchApplicationSearchRequest request, ActionListener<RenderMetadataAction.Response> listener) {
         systemIndexService.getSearchApplication(request.name(), listener.delegateFailure((l, searchApplication) -> {
             try {
-                final String renderedTemplate = templateService.renderTemplate(searchApplication, request);
-                listener.onResponse(new RenderMetadataAction.Response(renderedTemplate));
+                final Map<String,Object> renderedTemplateParams = templateService.renderTemplate(searchApplication, request);
+                listener.onResponse(new RenderMetadataAction.Response(renderedTemplateParams));
             } catch (Exception e) {
                 listener.onFailure(e);
             }

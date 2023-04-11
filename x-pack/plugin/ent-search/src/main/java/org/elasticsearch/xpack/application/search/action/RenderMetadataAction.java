@@ -18,6 +18,8 @@ import org.elasticsearch.xcontent.ToXContentObject;
 import org.elasticsearch.xcontent.XContentBuilder;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Map;
 import java.util.Objects;
 
 public class RenderMetadataAction extends ActionType<RenderMetadataAction.Response> {
@@ -25,36 +27,38 @@ public class RenderMetadataAction extends ActionType<RenderMetadataAction.Respon
     public static final RenderMetadataAction INSTANCE = new RenderMetadataAction();
     public static final String NAME = "cluster:admin/xpack/application/search_application/render_metadata";
 
-    private static final ParseField QUERY_PARAMS_FIELD = new ParseField("params");
-
     public RenderMetadataAction() {
         super(NAME, RenderMetadataAction.Response::new);
     }
 
     public static class Response extends ActionResponse implements ToXContentObject {
 
-        private final String renderedTemplate;
+        private final Map<String,Object> renderedTemplateParams;
 
         public Response(StreamInput in) throws IOException {
             super(in);
-            this.renderedTemplate = in.readString();
+            this.renderedTemplateParams = in.readMap();
         }
 
-        public Response(String renderedTemplate) {
-            this.renderedTemplate = renderedTemplate;
+        public Response(Map<String,Object> renderedTemplateParams) {
+            this.renderedTemplateParams = renderedTemplateParams;
         }
-
+        
         @Override
         public void writeTo(StreamOutput out) throws IOException {
-            out.writeString(renderedTemplate);
+            out.writeGenericMap(renderedTemplateParams);
         }
 
         @Override
         public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
             builder.startObject();
-            builder.field("renderedTemplate", this.renderedTemplate);
+            builder.field("params", Collections.singleton(this.renderedTemplateParams));
             builder.endObject();
             return builder;
+        }
+
+        public Map<String,Object> renderedTemplateParams() {
+            return this.renderedTemplateParams;
         }
 
         @Override
@@ -62,12 +66,12 @@ public class RenderMetadataAction extends ActionType<RenderMetadataAction.Respon
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Response response = (Response) o;
-            return renderedTemplate.equals(response.renderedTemplate);
+            return renderedTemplateParams.equals(response.renderedTemplateParams);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(renderedTemplate);
+            return Objects.hash(renderedTemplateParams);
         }
     }
 }

@@ -26,6 +26,8 @@ import org.elasticsearch.transport.TransportService;
 import org.elasticsearch.xcontent.NamedXContentRegistry;
 import org.elasticsearch.xpack.application.search.SearchApplicationTemplateService;
 
+import java.util.Map;
+
 public class TransportQuerySearchApplicationAction extends SearchApplicationTransportAction<
     SearchApplicationSearchRequest,
     SearchResponse> {
@@ -66,8 +68,8 @@ public class TransportQuerySearchApplicationAction extends SearchApplicationTran
     protected void doExecute(SearchApplicationSearchRequest request, ActionListener<SearchResponse> listener) {
         systemIndexService.getSearchApplication(request.name(), listener.delegateFailure((l, searchApplication) -> {
             try {
-                final String renderedTemplate = templateService.renderTemplate(searchApplication, request);
-                final SearchSourceBuilder sourceBuilder = templateService.renderQuery(searchApplication, renderedTemplate);
+                final Map<String,Object> renderedTemplateParams = templateService.renderTemplate(searchApplication, request);
+                final SearchSourceBuilder sourceBuilder = templateService.renderQuery(searchApplication, renderedTemplateParams);
                 SearchRequest searchRequest = new SearchRequest(searchApplication.indices()).source(sourceBuilder);
 
                 client.execute(

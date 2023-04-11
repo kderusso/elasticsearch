@@ -35,13 +35,7 @@ public class RestRenderQueryAction extends BaseRestHandler {
     @Override
     protected RestChannelConsumer prepareRequest(RestRequest restRequest, NodeClient client) throws IOException {
         final String searchAppName = restRequest.param("name");
-        SearchApplicationSearchRequest request;
-        if (restRequest.hasContent()) {
-            request = SearchApplicationSearchRequest.fromXContent(searchAppName, restRequest.contentParser());
-        } else {
-            request = new SearchApplicationSearchRequest(searchAppName);
-        }
-        final SearchApplicationSearchRequest finalRequest = request;
-        return channel -> client.execute(RenderQueryAction.INSTANCE, finalRequest, new RestToXContentListener<>(channel));
+        final RenderQueryAction.Request request = RenderQueryAction.Request.fromXContent(searchAppName, restRequest.contentParser());
+        return channel -> client.execute(RenderQueryAction.INSTANCE, request, new RestToXContentListener<>(channel));
     }
 }
