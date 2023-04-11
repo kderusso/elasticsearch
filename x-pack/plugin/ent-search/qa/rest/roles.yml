@@ -12,6 +12,7 @@ entsearch:
         "test-index3",
         "test-index4",
         "test-index-does-not-exist",
+        "another-index",
         # Search Applications (needed to create aliases)
         "test-search-application",
         "test-search-application-1",
