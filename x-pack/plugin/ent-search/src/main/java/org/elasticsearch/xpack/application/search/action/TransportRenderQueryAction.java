@@ -23,9 +23,7 @@ import org.elasticsearch.transport.TransportService;
 import org.elasticsearch.xcontent.NamedXContentRegistry;
 import org.elasticsearch.xpack.application.search.SearchApplicationTemplateService;
 
-public class TransportRenderQueryAction extends SearchApplicationTransportAction<
-    RenderQueryAction.Request,
-    RenderQueryAction.Response> {
+public class TransportRenderQueryAction extends SearchApplicationTransportAction<RenderQueryAction.Request, RenderQueryAction.Response> {
 
     private static final Logger logger = LogManager.getLogger(TransportRenderQueryAction.class);
 

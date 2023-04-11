@@ -29,14 +29,14 @@ public class RenderMetadataAction extends ActionType<RenderMetadataAction.Respon
 
     public static class Response extends ActionResponse implements ToXContentObject {
 
-        private final Map<String,Object> renderedTemplateParams;
+        private final Map<String, Object> renderedTemplateParams;
 
         public Response(StreamInput in) throws IOException {
             super(in);
             this.renderedTemplateParams = in.readMap();
         }
 
-        public Response(Map<String,Object> renderedTemplateParams) {
+        public Response(Map<String, Object> renderedTemplateParams) {
             this.renderedTemplateParams = renderedTemplateParams;
         }
 
@@ -53,7 +53,7 @@ public class RenderMetadataAction extends ActionType<RenderMetadataAction.Respon
             return builder;
         }
 
-        public Map<String,Object> renderedTemplateParams() {
+        public Map<String, Object> renderedTemplateParams() {
             return this.renderedTemplateParams;
         }
 

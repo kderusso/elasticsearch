@@ -40,7 +40,7 @@ public class RenderQueryAction extends ActionType<RenderQueryAction.Response> {
 
         private static final ParseField QUERY_PARAMS_FIELD = new ParseField("params");
         private final String name;
-        private final Map<String,Object> renderedTemplateParams;
+        private final Map<String, Object> renderedTemplateParams;
 
         private static final ConstructingObjectParser<Request, String> PARSER = new ConstructingObjectParser<>(
             QUERY_PARAMS_FIELD,
@@ -62,7 +62,7 @@ public class RenderQueryAction extends ActionType<RenderQueryAction.Response> {
             this.renderedTemplateParams = in.readMap();
         }
 
-        public Request(String name, Map<String,Object> renderedTemplateParams) {
+        public Request(String name, Map<String, Object> renderedTemplateParams) {
             this.name = name;
             this.renderedTemplateParams = renderedTemplateParams;
         }
@@ -92,8 +92,13 @@ public class RenderQueryAction extends ActionType<RenderQueryAction.Response> {
             return PARSER.apply(contentParser, name);
         }
 
-        public String name() { return name; }
-        public Map<String,Object> renderedTemplateParams() { return renderedTemplateParams; }
+        public String name() {
+            return name;
+        }
+
+        public Map<String, Object> renderedTemplateParams() {
+            return renderedTemplateParams;
+        }
 
         @Override
         public boolean equals(Object o) {
@@ -104,7 +109,9 @@ public class RenderQueryAction extends ActionType<RenderQueryAction.Response> {
         }
 
         @Override
-        public int hashCode() { return Objects.hash(renderedTemplateParams, name); }
+        public int hashCode() {
+            return Objects.hash(renderedTemplateParams, name);
+        }
     }
 
     public static class Response extends ActionResponse implements ToXContentObject {

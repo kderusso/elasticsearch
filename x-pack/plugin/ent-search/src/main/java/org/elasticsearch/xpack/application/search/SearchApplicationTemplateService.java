@@ -9,8 +9,6 @@ package org.elasticsearch.xpack.application.search;
 
 import org.elasticsearch.common.ValidationException;
 import org.elasticsearch.common.xcontent.LoggingDeprecationHandler;
-import org.elasticsearch.logging.LogManager;
-import org.elasticsearch.logging.Logger;
 import org.elasticsearch.script.Script;
 import org.elasticsearch.script.ScriptService;
 import org.elasticsearch.script.TemplateScript;
@@ -57,7 +55,7 @@ public class SearchApplicationTemplateService {
      * @return Map of all template parameters including template defaults for non-specified parameters
      * @throws ValidationException on invalid template parameters
      */
-    public Map<String,Object> renderTemplate(SearchApplication searchApplication, SearchApplicationSearchRequest request)
+    public Map<String, Object> renderTemplate(SearchApplication searchApplication, SearchApplicationSearchRequest request)
         throws ValidationException {
 
         final SearchApplicationTemplate template = searchApplication.searchApplicationTemplate();

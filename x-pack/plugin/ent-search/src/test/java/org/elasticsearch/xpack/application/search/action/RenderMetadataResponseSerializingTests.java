@@ -22,8 +22,9 @@ public class RenderMetadataResponseSerializingTests extends AbstractWireSerializ
 
     @Override
     protected RenderMetadataAction.Response createTestInstance() {
-        return new RenderMetadataAction.Response(randomMap(0, 7, () ->
-            new Tuple<>(randomAlphaOfLengthBetween(1, 10), randomAlphaOfLengthBetween(10, 25))));
+        return new RenderMetadataAction.Response(
+            randomMap(0, 7, () -> new Tuple<>(randomAlphaOfLengthBetween(1, 10), randomAlphaOfLengthBetween(10, 25)))
+        );
     }
 
     @Override
