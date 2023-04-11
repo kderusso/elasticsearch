@@ -40,11 +40,22 @@ The following example renders a query for a Search Application called `my-app`:
 
 [source,console]
 ----
-POST _application/search_application/my-app/_render_metadata
+POST _application/search_application/my-app/_render_query
 {
   "params": {
     "value": "my first query",
-    "from": 10
+    "size": 10,
+    "from": 0,
+    "text_fields": [
+        {
+            "name": "title",
+            "boost": 10
+        },
+        {
+            "name": "text",
+            "boost": 1
+        }
+    ]
   }
 }
 ----
@@ -55,22 +66,19 @@ A sample response:
 [source,console-result]
 ----
 {
+    "size": 10,
+    "from": 0,
     "query": {
-        "value": "my first query",
-        "size": 10,
-        "from": 10,
-        "text_fields": [
-            {
-                "name": "title",
-                "boost": 10
-            },
-            {
-                "name": "text",
-                "boost": 1
-            }
-        ]
+        "multi_match": {
+            "query": "my first query",
+            "fields": [
+                "title^10",
+                "text^1"
+            ]
+        }
     }
 }
+
 ----
 
 

@@ -56,10 +56,10 @@ A sample response:
 [source,console-result]
 ----
 {
-    "query": {
+    "params": {
         "value": "my first query",
         "size": 10,
-        "from": 10,
+        "from": 0,
         "text_fields": [
             {
                 "name": "title",

@@ -31,14 +31,10 @@ public class SearchApplicationTemplateService {
     private final ScriptService scriptService;
     private final NamedXContentRegistry xContentRegistry;
 
-    private static final Logger logger = LogManager.getLogger(SearchApplicationTemplateService.class);
-
     public SearchApplicationTemplateService(ScriptService scriptService, NamedXContentRegistry xContentRegistry) {
         this.scriptService = scriptService;
         this.xContentRegistry = xContentRegistry;
     }
-
-
 
     public SearchSourceBuilder renderQuery(SearchApplication searchApplication, Map<String, Object> templateParams) throws IOException {
         final Script script = searchApplication.searchApplicationTemplate().script();
@@ -56,10 +52,10 @@ public class SearchApplicationTemplateService {
     /**
      * Renders the search application's associated template with the provided request parameters.
      *
-     * @param searchApplication
-     * @param request
-     * @return
-     * @throws ValidationException
+     * @param searchApplication The SearchApplication we're accessing, to access the associated template
+     * @param request The search request, which is expected to contain a subset of the parameters included in the template.
+     * @return Map of all template parameters including template defaults for non-specified parameters
+     * @throws ValidationException on invalid template parameters
      */
     public Map<String,Object> renderTemplate(SearchApplication searchApplication, SearchApplicationSearchRequest request)
         throws ValidationException {

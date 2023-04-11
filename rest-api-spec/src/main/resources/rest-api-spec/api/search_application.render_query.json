@@ -31,8 +31,8 @@
       ]
     },
     "body": {
-      "description": "Search parameters, including template parameters that override defaults",
-      "required": false
+      "description": "Search parameters, consisting of all template parameters",
+      "required": true
     }
   }
 }
