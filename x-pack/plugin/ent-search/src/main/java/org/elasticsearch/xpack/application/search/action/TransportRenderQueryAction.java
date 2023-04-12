@@ -57,14 +57,10 @@ public class TransportRenderQueryAction extends SearchApplicationTransportAction
 
     @Override
     protected void doExecute(RenderQueryAction.Request request, ActionListener<RenderQueryAction.Response> listener) {
-        systemIndexService.getSearchApplication(request.name(), listener.delegateFailure((l, searchApplication) -> {
-            try {
-                final SearchSourceBuilder sourceBuilder = templateService.renderQuery(searchApplication, request.renderedTemplateParams());
-                listener.onResponse(new RenderQueryAction.Response(sourceBuilder));
-            } catch (Exception e) {
-                listener.onFailure(e);
-            }
-        }));
+        systemIndexService.getSearchApplication(request.name(), ActionListener.wrap(searchApplication -> {
+            final SearchSourceBuilder sourceBuilder = templateService.renderQuery(searchApplication, request.renderedTemplateParams());
+            listener.onResponse(new RenderQueryAction.Response(sourceBuilder));
+        }, listener::onFailure));
     }
 
 }

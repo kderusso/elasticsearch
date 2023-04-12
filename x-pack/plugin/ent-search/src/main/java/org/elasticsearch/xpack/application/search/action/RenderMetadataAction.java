@@ -21,7 +21,7 @@ import java.util.Objects;
 public class RenderMetadataAction extends ActionType<RenderMetadataAction.Response> {
 
     public static final RenderMetadataAction INSTANCE = new RenderMetadataAction();
-    public static final String NAME = "cluster:admin/xpack/application/search_application/render_metadata";
+    public static final String NAME = "cluster:admin/xpack/application/search_application/search";
 
     public RenderMetadataAction() {
         super(NAME, RenderMetadataAction.Response::new);
@@ -37,6 +37,7 @@ public class RenderMetadataAction extends ActionType<RenderMetadataAction.Respon
         }
 
         public Response(Map<String, Object> renderedTemplateParams) {
+            Objects.requireNonNull(renderedTemplateParams, "renderedTemplateParams must not be null");
             this.renderedTemplateParams = renderedTemplateParams;
         }
 

@@ -101,8 +101,6 @@ public class Constants {
         "cluster:admin/xpack/application/search_application/get",
         "cluster:admin/xpack/application/search_application/list",
         "cluster:admin/xpack/application/search_application/put",
-        "cluster:admin/xpack/application/search_application/render_metadata",
-        "cluster:admin/xpack/application/search_application/render_query",
         "cluster:admin/xpack/application/search_application/search",
         "cluster:admin/xpack/ccr/auto_follow_pattern/activate",
         "cluster:admin/xpack/ccr/auto_follow_pattern/delete",

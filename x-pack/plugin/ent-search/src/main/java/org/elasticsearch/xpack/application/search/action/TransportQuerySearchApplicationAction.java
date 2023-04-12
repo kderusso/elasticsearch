@@ -68,7 +68,7 @@ public class TransportQuerySearchApplicationAction extends SearchApplicationTran
     protected void doExecute(SearchApplicationSearchRequest request, ActionListener<SearchResponse> listener) {
         systemIndexService.getSearchApplication(request.name(), listener.delegateFailure((l, searchApplication) -> {
             try {
-                final Map<String, Object> renderedTemplateParams = templateService.renderTemplate(searchApplication, request);
+                final Map<String, Object> renderedTemplateParams = templateService.renderTemplate(searchApplication, request.queryParams());
                 final SearchSourceBuilder sourceBuilder = templateService.renderQuery(searchApplication, renderedTemplateParams);
                 SearchRequest searchRequest = new SearchRequest(searchApplication.indices()).source(sourceBuilder);
 

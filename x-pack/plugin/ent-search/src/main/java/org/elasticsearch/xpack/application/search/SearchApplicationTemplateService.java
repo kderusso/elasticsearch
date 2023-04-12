@@ -51,15 +51,14 @@ public class SearchApplicationTemplateService {
      * Renders the search application's associated template with the provided request parameters.
      *
      * @param searchApplication The SearchApplication we're accessing, to access the associated template
-     * @param request The search request, which is expected to contain a subset of the parameters included in the template.
+     * @param queryParams Specified parameters, which is expected to contain a subset of the parameters included in the template.
      * @return Map of all template parameters including template defaults for non-specified parameters
      * @throws ValidationException on invalid template parameters
      */
-    public Map<String, Object> renderTemplate(SearchApplication searchApplication, SearchApplicationSearchRequest request)
+    public Map<String, Object> renderTemplate(SearchApplication searchApplication, Map<String,Object> queryParams)
         throws ValidationException {
 
         final SearchApplicationTemplate template = searchApplication.searchApplicationTemplate();
-        final Map<String, Object> queryParams = request.queryParams();
         final Script script = template.script();
 
         template.validateTemplateParams(queryParams);
