@@ -30,7 +30,7 @@ import static org.elasticsearch.xcontent.ConstructingObjectParser.constructorArg
 public class RenderQueryAction extends ActionType<RenderQueryAction.Response> {
 
     public static final RenderQueryAction INSTANCE = new RenderQueryAction();
-    public static final String NAME = "cluster:admin/xpack/application/search_application/search";
+    public static final String NAME = "cluster:admin/xpack/application/search_application/render_query";
 
     public RenderQueryAction() {
         super(NAME, RenderQueryAction.Response::new);

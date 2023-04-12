@@ -21,7 +21,7 @@ import java.util.Objects;
 public class RenderMetadataAction extends ActionType<RenderMetadataAction.Response> {
 
     public static final RenderMetadataAction INSTANCE = new RenderMetadataAction();
-    public static final String NAME = "cluster:admin/xpack/application/search_application/search";
+    public static final String NAME = "cluster:admin/xpack/application/search_application/render_metadata";
 
     public RenderMetadataAction() {
         super(NAME, RenderMetadataAction.Response::new);
