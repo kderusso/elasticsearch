@@ -9,6 +9,8 @@ package org.elasticsearch.xpack.application.search;
 
 import org.elasticsearch.common.ValidationException;
 import org.elasticsearch.common.xcontent.LoggingDeprecationHandler;
+import org.elasticsearch.logging.LogManager;
+import org.elasticsearch.logging.Logger;
 import org.elasticsearch.script.Script;
 import org.elasticsearch.script.ScriptService;
 import org.elasticsearch.script.TemplateScript;
@@ -18,7 +20,6 @@ import org.elasticsearch.xcontent.XContentFactory;
 import org.elasticsearch.xcontent.XContentParser;
 import org.elasticsearch.xcontent.XContentParserConfiguration;
 import org.elasticsearch.xcontent.XContentType;
-import org.elasticsearch.xpack.application.search.action.SearchApplicationSearchRequest;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -29,14 +30,17 @@ public class SearchApplicationTemplateService {
     private final ScriptService scriptService;
     private final NamedXContentRegistry xContentRegistry;
 
+    private final Logger logger = LogManager.getLogger("SearchApplicationTemplateService");
+
     public SearchApplicationTemplateService(ScriptService scriptService, NamedXContentRegistry xContentRegistry) {
         this.scriptService = scriptService;
         this.xContentRegistry = xContentRegistry;
     }
 
     public SearchSourceBuilder renderQuery(SearchApplication searchApplication, Map<String, Object> templateParams) throws IOException {
+        final Map<String,Object> renderedTemplateParams = renderTemplate(searchApplication, templateParams);
         final Script script = searchApplication.searchApplicationTemplate().script();
-        TemplateScript compiledTemplate = scriptService.compile(script, TemplateScript.CONTEXT).newInstance(templateParams);
+        TemplateScript compiledTemplate = scriptService.compile(script, TemplateScript.CONTEXT).newInstance(renderedTemplateParams);
         String requestSource = compiledTemplate.execute();
         XContentParserConfiguration parserConfig = XContentParserConfiguration.EMPTY.withRegistry(xContentRegistry)
             .withDeprecationHandler(LoggingDeprecationHandler.INSTANCE);
