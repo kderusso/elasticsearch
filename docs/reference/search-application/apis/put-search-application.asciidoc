@@ -89,7 +89,18 @@ PUT _application/search_application/my-app?create
   }
 }
 ----
-// TEST[skip:TBD]
+// TESTSETUP
+
+//////////////////////////
+
+[source,console]
+--------------------------------------------------
+DELETE _application/search_application/my-app
+--------------------------------------------------
+// TEARDOWN
+
+//////////////////////////
+
 
 The following example creates or updates an existing Search Application called `my-app`:
 
@@ -116,5 +127,15 @@ PUT _application/search_application/my-app
   }
 }
 ----
-// TEST[skip:TBD]
+// TESTSETUP
+
+//////////////////////////
+
+[source,console]
+--------------------------------------------------
+DELETE _application/search_application/my-app
+--------------------------------------------------
+// TEARDOWN
+
+//////////////////////////
 
