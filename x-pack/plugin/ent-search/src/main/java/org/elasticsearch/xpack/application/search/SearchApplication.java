@@ -187,7 +187,7 @@ public class SearchApplication implements Writeable, ToXContentObject {
             builder.field(ANALYTICS_COLLECTION_NAME_FIELD.getPreferredName(), analyticsCollectionName);
         }
         builder.field(UPDATED_AT_MILLIS_FIELD.getPreferredName(), updatedAtMillis);
-        builder.field(TEMPLATE_FIELD.getPreferredName(), searchApplicationTemplate);
+        builder.field(TEMPLATE_FIELD.getPreferredName(), searchApplicationTemplateOrDefault());
         builder.endObject();
         return builder;
     }
