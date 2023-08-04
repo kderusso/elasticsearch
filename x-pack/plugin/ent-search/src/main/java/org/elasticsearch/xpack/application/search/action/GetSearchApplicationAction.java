@@ -19,7 +19,6 @@ import org.elasticsearch.xcontent.ToXContentObject;
 import org.elasticsearch.xcontent.XContentBuilder;
 import org.elasticsearch.xcontent.XContentParser;
 import org.elasticsearch.xpack.application.search.SearchApplication;
-import org.elasticsearch.xpack.application.search.SearchApplicationTemplate;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -118,16 +117,6 @@ public class GetSearchApplicationAction extends ActionType<GetSearchApplicationA
         public Response(SearchApplication app) {
             Objects.requireNonNull(app, "Search Application cannot be null");
             this.searchApp = app;
-        }
-
-        public Response(
-            String name,
-            String[] indices,
-            String analyticsCollectionName,
-            long updatedAtMillis,
-            SearchApplicationTemplate template
-        ) {
-            this.searchApp = new SearchApplication(name, indices, analyticsCollectionName, updatedAtMillis, template);
         }
 
         private static final ConstructingObjectParser<Response, String> PARSER = new ConstructingObjectParser<>(
