@@ -942,4 +942,33 @@ public class DynamicMappingTests extends MapperServiceTestCase {
 
         assertEquals(0, mapperService.mappingLookup().objectMappers().size());
     }
+
+    public void testDefaultDenseVectorMappings() throws IOException {
+        DocumentMapper mapper = createDocumentMapper(topMapping(b -> b.field("numeric_detection", true)));
+        doTestDefaultDenseVectorMappings(mapper, XContentFactory.jsonBuilder());
+        doTestDefaultDenseVectorMappings(mapper, XContentFactory.yamlBuilder());
+        doTestDefaultDenseVectorMappings(mapper, XContentFactory.smileBuilder());
+        doTestDefaultDenseVectorMappings(mapper, XContentFactory.cborBuilder());
+    }
+
+    private void doTestDefaultDenseVectorMappings(DocumentMapper mapper, XContentBuilder builder) throws IOException {
+        BytesReference source = BytesReference.bytes(
+            builder.startObject()
+                .field("smallTest", new float[] { 42.0f, 1.23f, 5.16f })
+//                .field("arrayTooShort", new Random().doubles(100, 0.0, 5.0).toArray())
+//                // TODO replace 100 with number between 1 and constant value - 1
+//                .field("mapsToFloat", new Random().doubles(100, 0.0, 10.0).mapToObj(Double::toString).toArray(String[]::new))
+//                // TODO replace 128 with number >= constant value
+//                .field("mapsToDenseVector", new Random().doubles(128, 0.0, 5.0).toArray())
+                .endObject()
+        );
+        ParsedDocument parsedDocument = mapper.parse(new SourceToParse("id", source, builder.contentType()));
+        Mapping update = parsedDocument.dynamicMappingsUpdate();
+        assertNotNull(update);
+        // This will always break :)
+        assertThat(((FieldMapper) update.getRoot().getMapper("smallTest")).fieldType().typeName(), equalTo("dense_vector"));
+//        assertThat(((FieldMapper) update.getRoot().getMapper("arrayTooShort")).fieldType().typeName(), equalTo("float"));
+//        assertThat(((FieldMapper) update.getRoot().getMapper("mapsToFloat")).fieldType().typeName(), equalTo("float"));
+//        assertThat(((FieldMapper) update.getRoot().getMapper("mapsToDenseVector")).fieldType().typeName(), equalTo("dense_vector"));
+    }
 }

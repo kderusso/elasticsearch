@@ -17,8 +17,11 @@ import org.elasticsearch.common.xcontent.XContentHelper;
 import org.elasticsearch.index.IndexVersion;
 import org.elasticsearch.index.fielddata.FieldDataContext;
 import org.elasticsearch.index.fielddata.IndexFieldDataCache;
+import org.elasticsearch.index.mapper.vectors.DenseVectorFieldMapper;
 import org.elasticsearch.index.query.SearchExecutionContext;
 import org.elasticsearch.indices.breaker.NoneCircuitBreakerService;
+import org.elasticsearch.logging.LogManager;
+import org.elasticsearch.logging.Logger;
 import org.elasticsearch.plugins.internal.DocumentParsingObserver;
 import org.elasticsearch.search.lookup.SearchLookup;
 import org.elasticsearch.search.lookup.Source;
@@ -39,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * A parser for documents
@@ -48,6 +52,8 @@ public final class DocumentParser {
     private final XContentParserConfiguration parserConfiguration;
     private final Supplier<DocumentParsingObserver> documentParsingObserverSupplier;
     private final MappingParserContext mappingParserContext;
+
+    private static final Logger logger = LogManager.getLogger(DocumentParser.class);
 
     DocumentParser(
         XContentParserConfiguration parserConfiguration,
@@ -71,6 +77,7 @@ public final class DocumentParser {
         if (source.source() != null && source.source().length() == 0) {
             throw new DocumentParsingException(new XContentLocation(0, 0), "failed to parse, document is empty");
         }
+        logger.info("Parsing document with source: " + source.source().utf8ToString());
         final RootDocumentParserContext context;
         final XContentType xContentType = source.getXContentType();
 
@@ -86,6 +93,8 @@ public final class DocumentParser {
             context = new RootDocumentParserContext(mappingLookup, mappingParserContext, source, parser);
             validateStart(context.parser());
             MetadataFieldMapper[] metadataFieldsMappers = mappingLookup.getMapping().getSortedMetadataMappers();
+            // Do we need a new field mapper that we call before other dynamic mappers, to pass in the array and determine if it's dense vector?
+            // Where the meat of documenet parsing happens
             internalParseDocument(metadataFieldsMappers, context);
             validateEnd(context.parser());
         } catch (XContentParseException e) {
@@ -134,16 +143,59 @@ public final class DocumentParser {
                 // entire type is disabled
                 context.parser().skipChildren();
             } else if (emptyDoc == false) {
+                // We have values, so we're not an empty doc, do this is our first entrypoint
                 parseObjectOrNested(context);
+                // At this point, the Lucene doc has 3 FloatFields, smallTest:42.0, smallTest:1.23, and smallTest:5.16.
+                postProcessParsedObject(context);
             }
 
             executeIndexTimeScripts(context);
 
             for (MetadataFieldMapper metadataMapper : metadataFieldsMappers) {
+                // Post-processing here, but this isn't a metadata field..
                 metadataMapper.postParse(context);
             }
         } catch (Exception e) {
             throw wrapInDocumentParsingException(context, e);
+        }
+    }
+
+    // I don't think this business logic would go here per se, but this is as good a place as any to put a POC to see if it's possible
+    private static void postProcessParsedObject(DocumentParserContext context) throws IOException {
+        List<Mapper> dynamicMappers = context.getDynamicMappers();
+
+        short minCutoff = 3; // this would be a constant and much bigger, small here for testing
+        short maxCutoff = DenseVectorFieldMapper.MAX_DIMS_COUNT;
+
+        // At this point we have an individual float field mapper, with the same field name, for each float in the array
+        logger.info("field mappers: " +
+            dynamicMappers.stream()
+                .map(Mapper::toString)
+                .collect(Collectors.joining(", "))
+        );
+
+        // Trying to parse an array of mixed values results in an error:
+        // java.lang.IllegalArgumentException: mapper [smallTest] cannot be changed from type [float] to [text]
+        // So I _think_ by the time we successfully get here we can assume that all fields map to the same thing.
+        Map<String,Long> fieldNamesToMapAsDenseVector = dynamicMappers.stream()
+            .filter(NumberFieldMapper.class::isInstance)
+            .map(NumberFieldMapper.class::cast)
+            .filter(m -> "float".equals(m.typeName()))
+            .collect(Collectors.groupingBy(NumberFieldMapper::name, Collectors.counting()))
+            .entrySet().stream()
+            .filter(e -> e.getValue() >= minCutoff && e.getValue() <= maxCutoff)
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        logger.info("fieldNamesToMapAsDenseVector: " + fieldNamesToMapAsDenseVector);
+        // Not sure how we can extract the values as a float[] at this point
+
+        // From here, maybe we could copy the mappers and make this dense vector?
+        List<Mapper> newDynamicMappers = new ArrayList<>();
+        for (Mapper mapper : dynamicMappers) {
+            if (fieldNamesToMapAsDenseVector.containsKey(mapper.name())) {
+                // Do the stuff...
+            } else {
+                newDynamicMappers.add(mapper);
+            }
         }
     }
 
@@ -245,6 +297,8 @@ public final class DocumentParser {
         }
         RootObjectMapper.Builder rootBuilder = context.updateRoot();
         for (Mapper mapper : context.getDynamicMappers()) {
+            // Called once for each individual element mapper, but once you add a field here you can't change its type
+            // So ideally by this point you've had already changed these to dense vector type
             rootBuilder.addDynamic(mapper.name(), null, mapper, context);
         }
         for (RuntimeField runtimeField : context.getDynamicRuntimeFields()) {
@@ -284,6 +338,7 @@ public final class DocumentParser {
             parser.nextToken();
         }
 
+        // This is where the meat of parsing happens
         innerParseObject(context);
         // restore the enable path flag
         if (context.parent().isNested()) {
@@ -326,6 +381,7 @@ public final class DocumentParser {
                     parseObject(context, currentFieldName);
                     break;
                 case START_ARRAY:
+                    // Touchpoint for an array of floats
                     parseArray(context, currentFieldName);
                     break;
                 case VALUE_NULL:
@@ -519,7 +575,7 @@ public final class DocumentParser {
     }
 
     private static void parseArray(DocumentParserContext context, String lastFieldName) throws IOException {
-        Mapper mapper = getLeafMapper(context, lastFieldName);
+        Mapper mapper = getLeafMapper(context, lastFieldName); // Will be null for dynamic fields
         if (mapper != null) {
             // There is a concrete mapper for this field already. Need to check if the mapper
             // expects an array, if so we pass the context straight to the mapper and if not
@@ -537,6 +593,8 @@ public final class DocumentParser {
             } else {
                 Mapper objectMapperFromTemplate = DynamicFieldsBuilder.createObjectMapperFromTemplate(context, lastFieldName);
                 if (objectMapperFromTemplate == null) {
+                    // Consider a conditional here, to conditionally call parseObjectOrField on the array.
+                    // There's no mapper and no template, so we parse as a non-dynamic array.
                     parseNonDynamicArray(context, lastFieldName, lastFieldName);
                 } else {
                     if (parsesArrayValue(objectMapperFromTemplate)) {
@@ -630,6 +688,7 @@ public final class DocumentParser {
             failIfMatchesRoutingPath(context, currentFieldName);
             return;
         }
+        // Creating a dynamic field for my test field here
         context.dynamic().getDynamicFieldsBuilder().createDynamicFieldFromValue(context, currentFieldName);
     }
 

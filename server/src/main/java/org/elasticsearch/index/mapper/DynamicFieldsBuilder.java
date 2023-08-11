@@ -14,6 +14,8 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.time.DateFormatter;
 import org.elasticsearch.core.CheckedRunnable;
 import org.elasticsearch.index.mapper.ObjectMapper.Dynamic;
+import org.elasticsearch.logging.LogManager;
+import org.elasticsearch.logging.Logger;
 import org.elasticsearch.script.ScriptCompiler;
 import org.elasticsearch.xcontent.XContentParser;
 
@@ -32,6 +34,8 @@ final class DynamicFieldsBuilder {
     static final DynamicFieldsBuilder DYNAMIC_TRUE = new DynamicFieldsBuilder(CONCRETE);
     static final DynamicFieldsBuilder DYNAMIC_RUNTIME = new DynamicFieldsBuilder(new Runtime());
 
+    private static final Logger logger = LogManager.getLogger(DynamicFieldsBuilder.class);
+
     private final Strategy strategy;
 
     private DynamicFieldsBuilder(Strategy strategy) {
@@ -48,6 +52,8 @@ final class DynamicFieldsBuilder {
         XContentParser.Token token = context.parser().currentToken();
         if (token == XContentParser.Token.VALUE_STRING) {
             String text = context.parser().text();
+            // At this point we are parsing a single field in the array
+            logger.info("Parsing text for dynamic field mapping " + text);
 
             boolean parseableAsLong = false;
             try {
@@ -114,6 +120,7 @@ final class DynamicFieldsBuilder {
             }
         } else if (token == XContentParser.Token.VALUE_NUMBER) {
             XContentParser.NumberType numberType = context.parser().numberType();
+            logger.info("Parsing numberType for dynamic field mapping " + numberType);
             if (numberType == XContentParser.NumberType.INT
                 || numberType == XContentParser.NumberType.LONG
                 || numberType == XContentParser.NumberType.BIG_INTEGER) {
@@ -198,6 +205,7 @@ final class DynamicFieldsBuilder {
         CheckedRunnable<IOException> dynamicFieldStrategy
     ) throws IOException {
         assert matchType != DynamicTemplate.XContentFieldType.DATE;
+        logger.info("Creating dynamicField " + name + " with matchType " + matchType + " and dynamicFieldStrategy " + dynamicFieldStrategy);
         createDynamicField(context, name, matchType, null, dynamicFieldStrategy);
     }
 
@@ -291,6 +299,10 @@ final class DynamicFieldsBuilder {
         void newDynamicBooleanField(DocumentParserContext context, String name) throws IOException;
 
         void newDynamicDateField(DocumentParserContext context, String name, DateFormatter dateFormatter) throws IOException;
+
+        // Not sure if we want to add a new DynamicDenseVector field here or not - it follows the pattern but
+        // we don't have access to the entire array here, which means we can't know if it's a dense vector at this point?
+        // Might be better to keep mapping to float and then post process.
     }
 
     /**
