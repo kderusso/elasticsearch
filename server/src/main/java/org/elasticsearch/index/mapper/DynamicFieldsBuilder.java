@@ -120,7 +120,7 @@ final class DynamicFieldsBuilder {
             }
         } else if (token == XContentParser.Token.VALUE_NUMBER) {
             XContentParser.NumberType numberType = context.parser().numberType();
-            logger.info("Parsing numberType for dynamic field mapping " + numberType);
+            // At this point the floating numbers are sent in as doubles
             if (numberType == XContentParser.NumberType.INT
                 || numberType == XContentParser.NumberType.LONG
                 || numberType == XContentParser.NumberType.BIG_INTEGER) {
@@ -205,7 +205,7 @@ final class DynamicFieldsBuilder {
         CheckedRunnable<IOException> dynamicFieldStrategy
     ) throws IOException {
         assert matchType != DynamicTemplate.XContentFieldType.DATE;
-        logger.info("Creating dynamicField " + name + " with matchType " + matchType + " and dynamicFieldStrategy " + dynamicFieldStrategy);
+        // Here's where we create dynamic fields with matchType double
         createDynamicField(context, name, matchType, null, dynamicFieldStrategy);
     }
 

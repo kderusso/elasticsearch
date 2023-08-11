@@ -17,7 +17,6 @@ import org.elasticsearch.common.xcontent.XContentHelper;
 import org.elasticsearch.index.IndexVersion;
 import org.elasticsearch.index.fielddata.FieldDataContext;
 import org.elasticsearch.index.fielddata.IndexFieldDataCache;
-import org.elasticsearch.index.mapper.vectors.DenseVectorFieldMapper;
 import org.elasticsearch.index.query.SearchExecutionContext;
 import org.elasticsearch.indices.breaker.NoneCircuitBreakerService;
 import org.elasticsearch.logging.LogManager;
@@ -43,6 +42,9 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+
+import static org.elasticsearch.index.mapper.vectors.DenseVectorFieldMapper.MAX_DIMS_COUNT;
+import static org.elasticsearch.index.mapper.vectors.DenseVectorFieldMapper.MIN_DIMS_FOR_DYNAMIC_MAPPING;
 
 /**
  * A parser for documents
@@ -164,8 +166,8 @@ public final class DocumentParser {
     private static void postProcessParsedObject(DocumentParserContext context) throws IOException {
         List<Mapper> dynamicMappers = context.getDynamicMappers();
 
-        short minCutoff = 3; // this would be a constant and much bigger, small here for testing
-        short maxCutoff = DenseVectorFieldMapper.MAX_DIMS_COUNT;
+        short minCutoff = MIN_DIMS_FOR_DYNAMIC_MAPPING;
+        short maxCutoff = MAX_DIMS_COUNT;
 
         // At this point we have an individual float field mapper, with the same field name, for each float in the array
         logger.info("field mappers: " +

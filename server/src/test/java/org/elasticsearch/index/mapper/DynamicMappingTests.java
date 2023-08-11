@@ -18,7 +18,10 @@ import org.elasticsearch.xcontent.XContentFactory;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Random;
 
+import static org.elasticsearch.index.mapper.vectors.DenseVectorFieldMapper.MAX_DIMS_COUNT;
+import static org.elasticsearch.index.mapper.vectors.DenseVectorFieldMapper.MIN_DIMS_FOR_DYNAMIC_MAPPING;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
@@ -952,23 +955,20 @@ public class DynamicMappingTests extends MapperServiceTestCase {
     }
 
     private void doTestDefaultDenseVectorMappings(DocumentMapper mapper, XContentBuilder builder) throws IOException {
+        Random random = new Random();
         BytesReference source = BytesReference.bytes(
             builder.startObject()
-                .field("smallTest", new float[] { 42.0f, 1.23f, 5.16f })
-//                .field("arrayTooShort", new Random().doubles(100, 0.0, 5.0).toArray())
-//                // TODO replace 100 with number between 1 and constant value - 1
-//                .field("mapsToFloat", new Random().doubles(100, 0.0, 10.0).mapToObj(Double::toString).toArray(String[]::new))
-//                // TODO replace 128 with number >= constant value
-//                .field("mapsToDenseVector", new Random().doubles(128, 0.0, 5.0).toArray())
+                .field("mapsToFloatTooSmall", random.doubles(MIN_DIMS_FOR_DYNAMIC_MAPPING - 1, 0.0, 5.0).toArray())
+                .field("mapsToFloatTooBig", random.doubles(MAX_DIMS_COUNT + 1, 0.0, 5.0).toArray())
+                .field("mapsToDenseVector", new Random().doubles(MIN_DIMS_FOR_DYNAMIC_MAPPING, 0.0, 5.0).toArray())
                 .endObject()
         );
         ParsedDocument parsedDocument = mapper.parse(new SourceToParse("id", source, builder.contentType()));
         Mapping update = parsedDocument.dynamicMappingsUpdate();
         assertNotNull(update);
+        assertThat(((FieldMapper) update.getRoot().getMapper("mapsToFloatTooSmall")).fieldType().typeName(), equalTo("float"));
+        assertThat(((FieldMapper) update.getRoot().getMapper("mapsToFloatTooBig")).fieldType().typeName(), equalTo("float"));
         // This will always break :)
-        assertThat(((FieldMapper) update.getRoot().getMapper("smallTest")).fieldType().typeName(), equalTo("dense_vector"));
-//        assertThat(((FieldMapper) update.getRoot().getMapper("arrayTooShort")).fieldType().typeName(), equalTo("float"));
-//        assertThat(((FieldMapper) update.getRoot().getMapper("mapsToFloat")).fieldType().typeName(), equalTo("float"));
-//        assertThat(((FieldMapper) update.getRoot().getMapper("mapsToDenseVector")).fieldType().typeName(), equalTo("dense_vector"));
+        assertThat(((FieldMapper) update.getRoot().getMapper("mapsToDenseVector")).fieldType().typeName(), equalTo("dense_vector"));
     }
 }
