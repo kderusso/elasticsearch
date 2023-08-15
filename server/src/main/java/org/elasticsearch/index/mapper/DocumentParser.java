@@ -17,6 +17,7 @@ import org.elasticsearch.common.xcontent.XContentHelper;
 import org.elasticsearch.index.IndexVersion;
 import org.elasticsearch.index.fielddata.FieldDataContext;
 import org.elasticsearch.index.fielddata.IndexFieldDataCache;
+import org.elasticsearch.index.mapper.vectors.DenseVectorFieldMapper;
 import org.elasticsearch.index.query.SearchExecutionContext;
 import org.elasticsearch.indices.breaker.NoneCircuitBreakerService;
 import org.elasticsearch.logging.LogManager;
@@ -195,6 +196,9 @@ public final class DocumentParser {
         for (Mapper mapper : dynamicMappers) {
             if (fieldNamesToMapAsDenseVector.containsKey(mapper.name())) {
                 // Do the stuff...
+
+                Mapper newDenseVectorFieldMapper
+
             } else {
                 newDynamicMappers.add(mapper);
             }

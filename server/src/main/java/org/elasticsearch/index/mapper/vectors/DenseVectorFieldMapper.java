@@ -156,10 +156,10 @@ public class DenseVectorFieldMapper extends FieldMapper {
                 new DenseVectorFieldType(
                     context.buildFullName(name),
                     indexVersionCreated,
-                    elementType.getValue(),
-                    dims.getValue(),
-                    indexed.getValue(),
-                    similarity.getValue(),
+                    elementType.getValue(), // Float
+                    dims.getValue(), // Array size
+                    indexed.getValue(), // True
+                    similarity.getValue(), // Dot product is most performant. Get values and calculate product - if vector length = 1 dot product else cosine. See https://github.com/elastic/elasticsearch/blob/main/server/src/main/java/org/elasticsearch/index/mapper/vectors/DenseVectorFieldMapper.java#L323  if square magnitude == 1 dot product
                     meta.getValue()
                 ),
                 elementType.getValue(),
