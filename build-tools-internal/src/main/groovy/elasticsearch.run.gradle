@@ -6,7 +6,6 @@
  * Side Public License, v 1.
  */
 
-import org.elasticsearch.gradle.VersionProperties
 import org.elasticsearch.gradle.testclusters.RunTask
 
 // gradle has an open issue of failing applying plugins in
@@ -14,24 +13,40 @@ import org.elasticsearch.gradle.testclusters.RunTask
 // apply plugin: 'elasticsearch.internal-testclusters'
 
 testClusters.register("runTask") {
-    testDistribution = providers.systemProperty('run.distribution').orElse('default').get()
-    if (providers.systemProperty('run.distribution').getOrElse('default') == 'default') {
-      String licenseType = providers.systemProperty("run.license_type").getOrElse("basic")
-      if (licenseType == 'trial') {
-        setting 'xpack.ml.enabled', 'true'
-        setting 'xpack.graph.enabled', 'true'
-        setting 'xpack.watcher.enabled', 'true'
-        setting 'xpack.license.self_generated.type', 'trial'
-      } else if (licenseType != 'basic') {
-        throw new IllegalArgumentException("Unsupported self-generated license type: [" + licenseType + "[basic] or [trial].")
-      }
-      // Not enabled by default in the build, otherwise all integration tests will download the databases from our geoip download service:
-      systemProperty 'ingest.geoip.downloader.enabled.default', 'true'
-      setting 'xpack.security.enabled', 'true'
-      keystore 'bootstrap.password', 'password'
-      user username: 'elastic-admin', password: 'elastic-password', role: '_es_test_root'
-      numberOfNodes = 1
+  testDistribution = providers.systemProperty('run.distribution').orElse('default').get()
+  if (providers.systemProperty('run.distribution').getOrElse('default') == 'default') {
+    String licenseType = providers.systemProperty("run.license_type").getOrElse("basic")
+    if (licenseType == 'trial') {
+      setting 'xpack.ml.enabled', 'true'
+      setting 'xpack.graph.enabled', 'true'
+      setting 'xpack.watcher.enabled', 'true'
+      setting 'xpack.license.self_generated.type', 'trial'
+    } else if (licenseType != 'basic') {
+      throw new IllegalArgumentException("Unsupported self-generated license type: [" + licenseType + "[basic] or [trial].")
     }
+    // Not enabled by default in the build, otherwise all integration tests will download the databases from our geoip download service:
+    systemProperty 'ingest.geoip.downloader.enabled.default', 'true'
+    setting 'xpack.security.enabled', 'true'
+    keystore 'bootstrap.password', 'password'
+    user username: 'elastic-admin', password: 'elastic-password', role: '_es_test_root'
+    numberOfNodes = 1
+
+    setting 'http.cors.allow-origin', '"*"'
+    setting 'http.cors.enabled', 'true'
+    setting 'http.cors.allow-credentials', 'true'
+    setting 'http.cors.allow-methods', 'OPTIONS, HEAD, GET, POST, PUT, DELETE'
+    setting 'http.cors.allow-headers',
+      'X-Requested-With, X-Auth-Token, Content-Type, Content-Length, Authorization, Access-Control-Allow-Headers, Accept, x-elastic-client-meta'
+    keystore 'xpack.security.authc.realms.jwt.jwt1.hmac_key', 'c409246deb1a0dd3dee162061ad1cb8edddf127dc292331c511a341b5f2c88db'
+    setting 'xpack.security.authc.realms.jwt.jwt1.order', '2'
+    setting 'xpack.security.authc.realms.jwt.jwt1.client_authentication.type', 'none'
+    setting 'xpack.security.authc.realms.jwt.jwt1.allowed_issuer', '"http://localhost/"'
+    setting 'xpack.security.authc.realms.jwt.jwt1.allowed_audiences', '["localhost"]'
+    setting 'xpack.security.authc.realms.jwt.jwt1.allowed_signature_algorithms', '[HS256]'
+    setting 'xpack.security.authc.realms.jwt.jwt1.claim_patterns.principal', '"^([^@]+)@elastic\\\\.co$"'
+    setting 'xpack.security.authc.realms.jwt.jwt1.claims.principal', 'email'
+    setting 'xpack.security.authc.realms.jwt.jwt1.claims.mail', 'email'
+  }
 }
 
 tasks.register("run", RunTask) {
