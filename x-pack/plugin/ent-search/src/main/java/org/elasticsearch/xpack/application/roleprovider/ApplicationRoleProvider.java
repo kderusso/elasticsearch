@@ -16,11 +16,14 @@ import org.elasticsearch.client.internal.Client;
 import org.elasticsearch.client.internal.OriginSettingClient;
 import org.elasticsearch.core.Nullable;
 import org.elasticsearch.index.query.TermQueryBuilder;
+import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.xpack.core.security.authz.RoleDescriptor;
 import org.elasticsearch.xpack.core.security.authz.store.RoleRetrievalResult;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -42,31 +45,37 @@ public class ApplicationRoleProvider implements BiConsumer<Set<String>, ActionLi
         Set<RoleDescriptor> roleDescriptors = new HashSet<>();
 
         for (String role : roles) {
-            if (role.startsWith("connectors")) {
+            if (role.startsWith("managed")) {
                 ApplicationRoleConfiguration roleConfig = ApplicationRoleConfiguration.getConfiguration(client, role);
                 if (roleConfig == null) {
                     continue;
                 }
 
-                String query = ApplicationRoleConfiguration.getRoleDescriptorQuery(roleConfig, role, client);
-                if (query == null) {
+                List<String> queries = ApplicationRoleConfiguration.getRoleDescriptorQuery(roleConfig, role, client);
+                if (queries == null) {
                     continue;
                 }
 
-                roleDescriptors.add(
-                    new RoleDescriptor(
-                        role,
-                        new String[] { "all" },
-                        new RoleDescriptor.IndicesPrivileges[] {
-                            RoleDescriptor.IndicesPrivileges.builder()
-                                .privileges("read")
-                                .indices(roleConfig.targetIndex)
-                                .grantedFields("*")
-                                .query(query)
-                                .build() },
-                        null
-                    )
-                );
+                for (String query : queries) {
+                    if (query == null) {
+                        continue;
+                    }
+
+                    roleDescriptors.add(
+                        new RoleDescriptor(
+                            role,
+                            new String[] { "all" },
+                            new RoleDescriptor.IndicesPrivileges[] {
+                                RoleDescriptor.IndicesPrivileges.builder()
+                                    .privileges("read")
+                                    .indices(roleConfig.targetIndex)
+                                    .grantedFields("*")
+                                    .query(query)
+                                    .build() },
+                            null
+                        )
+                    );
+                }
             }
         }
         listener.onResponse(RoleRetrievalResult.success(roleDescriptors));
@@ -97,14 +106,14 @@ public class ApplicationRoleProvider implements BiConsumer<Set<String>, ActionLi
             }
             Map<String, Object> source = response.getSource();
             String targetIndex = source.get("target_index").toString();
-            String rolesIndex = source.get("roles_index").toString();
-            String lookupField = source.get("lookup_field").toString();
+            String rolesIndex = source.get("acl_index").toString();
+            String lookupField = source.get("acl_field").toString();
 
             return new ApplicationRoleConfiguration(targetIndex, rolesIndex, lookupField);
         }
 
         @SuppressWarnings({ "unchecked" })
-        public static String getRoleDescriptorQuery(ApplicationRoleConfiguration config, String role, Client client) {
+        public static List<String> getRoleDescriptorQuery(ApplicationRoleConfiguration config, String role, Client client) {
             String lookupValue = role.split(":")[2];
             TermQueryBuilder termQueryBuilder = new TermQueryBuilder(config.lookupField, lookupValue);
             SearchSourceBuilder source = new SearchSourceBuilder().query(termQueryBuilder);
@@ -119,7 +128,11 @@ public class ApplicationRoleProvider implements BiConsumer<Set<String>, ActionLi
                 return null;
             }
 
-            return searchResponse.getHits().getAt(0).getSourceAsMap().get("query").toString();
+            List<String> roleDescriptorQueries = new ArrayList<>();
+            for (SearchHit hit : searchResponse.getHits()) {
+                roleDescriptorQueries.add(hit.getSourceAsMap().get("query").toString());
+            }
+            return roleDescriptorQueries;
         }
     }
 }
