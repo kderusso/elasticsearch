@@ -106,8 +106,8 @@ public class ApplicationRoleProvider implements BiConsumer<Set<String>, ActionLi
             }
             Map<String, Object> source = response.getSource();
             String targetIndex = source.get("target_index").toString();
-            String rolesIndex = source.get("acl_index").toString();
-            String lookupField = source.get("acl_field").toString();
+            String rolesIndex = source.get("roles_index").toString();
+            String lookupField = source.get("lookup_field").toString();
 
             return new ApplicationRoleConfiguration(targetIndex, rolesIndex, lookupField);
         }
