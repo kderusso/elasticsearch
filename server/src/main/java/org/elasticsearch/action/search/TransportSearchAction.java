@@ -146,9 +146,11 @@ public class TransportSearchAction extends HandledTransportAction<SearchRequest,
     private final ExecutorSelector executorSelector;
     private final int defaultPreFilterShardSize;
     private final boolean ccsCheckCompatibility;
+    private final QueryLoggingService queryLoggingService;
 
     @Inject
     public TransportSearchAction(
+        Client client,
         ThreadPool threadPool,
         CircuitBreakerService circuitBreakerService,
         TransportService transportService,
@@ -177,6 +179,7 @@ public class TransportSearchAction extends HandledTransportAction<SearchRequest,
         this.executorSelector = executorSelector;
         this.defaultPreFilterShardSize = DEFAULT_PRE_FILTER_SHARD_SIZE.get(clusterService.getSettings());
         this.ccsCheckCompatibility = SearchService.CCS_VERSION_CHECK_SETTING.get(clusterService.getSettings());
+        this.queryLoggingService = new QueryLoggingService(client);
     }
 
     private Map<String, OriginalIndices> buildPerIndexOriginalIndices(
@@ -283,6 +286,7 @@ public class TransportSearchAction extends HandledTransportAction<SearchRequest,
     @Override
     protected void doExecute(Task task, SearchRequest searchRequest, ActionListener<SearchResponse> listener) {
         ActionListener<SearchResponse> loggingListener = listener.delegateFailureAndWrap((l, searchResponse) -> {
+            queryLoggingService.logQuery(searchRequest, searchResponse);
             if (searchResponse.getShardFailures() != null && searchResponse.getShardFailures().length > 0) {
                 // Deduplicate failures by exception message and index
                 ShardOperationFailedException[] groupedFailures = ExceptionsHelper.groupBy(searchResponse.getShardFailures());
