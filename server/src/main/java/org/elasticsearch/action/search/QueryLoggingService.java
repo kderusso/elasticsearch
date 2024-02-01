@@ -40,6 +40,7 @@ public class QueryLoggingService {
 
     public void logQuery(SearchRequest searchRequest, SearchResponse searchResponse) {
         try {
+
             XContentBuilder builder = XContentFactory.jsonBuilder();
 
             builder.startObject();
