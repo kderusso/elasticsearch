@@ -18,8 +18,6 @@ import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.io.stream.Writeable;
 import org.elasticsearch.common.xcontent.XContentHelper;
 import org.elasticsearch.core.Nullable;
-import org.elasticsearch.logging.LogManager;
-import org.elasticsearch.logging.Logger;
 import org.elasticsearch.xcontent.ConstructingObjectParser;
 import org.elasticsearch.xcontent.ParseField;
 import org.elasticsearch.xcontent.ToXContentObject;
@@ -47,8 +45,6 @@ public class QueryRuleCriteria implements Writeable, ToXContentObject {
     private final String criteriaMetadata;
     private final List<Object> criteriaValues;
     private final Map<String, Object> criteriaProperties;
-
-    private static final Logger logger = LogManager.getLogger(QueryRuleCriteria.class);
 
     /**
      *
@@ -82,7 +78,7 @@ public class QueryRuleCriteria implements Writeable, ToXContentObject {
         this.criteriaType = criteriaType;
 
         this.criteriaProperties = criteriaProperties == null ? Map.of() : criteriaProperties;
-        // TODO criteriaType.validateProperties(criteriaProperties);
+        // TODO validate properties
 
     }
 
@@ -225,11 +221,11 @@ public class QueryRuleCriteria implements Writeable, ToXContentObject {
         return Strings.toString(this);
     }
 
-    public boolean isMatch(Client client, Object matchValue, QueryRuleCriteriaType matchType) {
-        return isMatch(client, matchValue, matchType, true);
+    public boolean isMatch(Client client, String index, Object matchValue, QueryRuleCriteriaType matchType) {
+        return isMatch(client, index, matchValue, matchType, true);
     }
 
-    public boolean isMatch(Client client, Object matchValue, QueryRuleCriteriaType matchType, boolean throwOnInvalidInput) {
+    public boolean isMatch(Client client, String index, Object matchValue, QueryRuleCriteriaType matchType, boolean throwOnInvalidInput) {
         if (matchType == ALWAYS) {
             return true;
         }
@@ -240,7 +236,7 @@ public class QueryRuleCriteria implements Writeable, ToXContentObject {
                 return false;
             }
             QueryRulesAnalysisService analysisService = new QueryRulesAnalysisService(client);
-            boolean matchFound = matchType.isMatch(analysisService, matchString, criteriaValue, criteriaProperties);
+            boolean matchFound = matchType.isMatch(analysisService, index, matchString, criteriaValue, criteriaProperties);
             if (matchFound) {
                 return true;
             }

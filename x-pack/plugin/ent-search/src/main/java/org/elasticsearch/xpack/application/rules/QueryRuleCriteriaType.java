@@ -27,35 +27,8 @@ public enum QueryRuleCriteriaType {
     EXACT {
         @Override
         public boolean isMatch(Object input, Object criteriaValue, Map<String, Object> criteriaProperties) {
-            throw new UnsupportedOperationException("[" + this + "] criteria type requires analysis service");
-        }
-
-        @Override
-        public boolean isMatch(
-            QueryRulesAnalysisService analysisService,
-            Object input,
-            Object criteriaValue,
-            Map<String, Object> criteriaProperties
-        ) {
             if (input instanceof String && criteriaValue instanceof String) {
-
-                if (criteriaProperties.containsKey("analysis")) {
-                    @SuppressWarnings("unchecked")
-                    List<Map<String, Object>> analysisChain = (List<Map<String, Object>>) criteriaProperties.get("analysis");
-                    String analyzedInput = (String) input;
-                    String analyzedCriteriaValue = (String) criteriaValue;
-                    for (Map<String, Object> analysisConfig : analysisChain) {
-                        String tokenizer = analysisConfig.containsKey("tokenizer") ? (String) analysisConfig.get("tokenizer") : "keyword";
-                        String filter = analysisConfig.containsKey("filter") ? (String) analysisConfig.get("filter") : "lowercase";
-                        QueryRulesAnalysisConfig config = new QueryRulesAnalysisConfig(null, tokenizer, List.of(filter));
-                        analyzedInput = analysisService.analyze(analyzedInput, config);
-                        analyzedCriteriaValue = analysisService.analyze(analyzedCriteriaValue, config);
-                    }
-                    return analyzedInput.equals(analyzedCriteriaValue);
-                } else {
-                    return input.equals(criteriaValue);
-                }
-
+                return input.equals(criteriaValue);
             } else {
                 return parseDouble(input) == parseDouble(criteriaValue);
             }
@@ -131,11 +104,24 @@ public enum QueryRuleCriteriaType {
 
     public boolean isMatch(
         QueryRulesAnalysisService analysisService,
+        String index,
         Object input,
         Object criteriaValue,
         Map<String, Object> criteriaProperties
     ) {
-        return isMatch(input, criteriaValue, criteriaProperties);
+        if (criteriaProperties.containsKey("analysis")) {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> analysisChain = (List<Map<String, Object>>) criteriaProperties.get("analysis");
+            QueryRulesAnalysisService.AnalyzedContent analyzedContent = analysisService.analyzeContent(
+                analysisChain,
+                index,
+                (String) input,
+                (String) criteriaValue
+            );
+            return isMatch(analyzedContent.analyzedInput(), analyzedContent.analyzedCriteriaValue(), criteriaProperties);
+        } else {
+            return isMatch(input, criteriaValue, criteriaProperties);
+        }
     }
 
     public static QueryRuleCriteriaType type(String criteriaType) {

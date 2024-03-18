@@ -15,6 +15,8 @@ import org.elasticsearch.logging.LogManager;
 import org.elasticsearch.logging.Logger;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.elasticsearch.xpack.core.ClientHelper.ENT_SEARCH_ORIGIN;
 
@@ -30,27 +32,37 @@ public class QueryRulesAnalysisService {
         this.clientWithOrigin = new OriginSettingClient(client, ENT_SEARCH_ORIGIN);
     }
 
-    public String analyze(String text, QueryRulesAnalysisConfig analysisConfig) {
-
-        logger.info("Analyzing original text [" + text + "]");
-
+    public String analyze(String index, String text, QueryRulesAnalysisConfig analysisConfig) {
         String analyzer = analysisConfig.analyzer();
         String tokenizer = analysisConfig.tokenizer();
         List<String> filters = analysisConfig.filters();
-
-        AnalyzeAction.Request analyzeRequest = new AnalyzeAction.Request().analyzer(analyzer)
-            .tokenizer(tokenizer)
-            .addTokenFilters(filters)
-            .text(text);
+        AnalyzeAction.Request analyzeRequest = new AnalyzeAction.Request().text(text).index(index);
+        if (analyzer != null) {
+            analyzeRequest.analyzer(analyzer);
+        }
+        if (tokenizer != null) {
+            analyzeRequest.tokenizer(tokenizer);
+        }
+        if (filters != null) {
+            analyzeRequest.addTokenFilters(filters);
+        }
         AnalyzeAction.Response analyzeResponse = clientWithOrigin.execute(AnalyzeAction.INSTANCE, analyzeRequest).actionGet(TIMEOUT_MS);
         List<AnalyzeAction.AnalyzeToken> analyzeTokens = analyzeResponse.getTokens();
-        StringBuilder sb = new StringBuilder();
-        for (AnalyzeAction.AnalyzeToken analyzeToken : analyzeTokens) {
-            logger.info("Analyzed term: [" + analyzeToken.getTerm() + "]");
-            sb.append(analyzeToken.getTerm()).append(" ");
-
-        }
-        return sb.toString().trim();
+        return analyzeTokens.stream().map(AnalyzeAction.AnalyzeToken::getTerm).collect(Collectors.joining(" "));
     }
+
+    public AnalyzedContent analyzeContent(List<Map<String, Object>> analysisChain, String index, String input, String criteriaValue) {
+        String analyzedInput = input;
+        String analyzedCriteriaValue = criteriaValue;
+        for (Map<String, Object> analysisConfig : analysisChain) {
+            QueryRulesAnalysisConfig analysisConfigObj = QueryRulesAnalysisConfig.fromMap(analysisConfig);
+            analyzedInput = analyze(index, analyzedInput, analysisConfigObj);
+            analyzedCriteriaValue = analyze(index, analyzedCriteriaValue, analysisConfigObj);
+            logger.info("analyzedInput: " + analyzedInput + "; analyzedCriteriaValue: " + analyzedCriteriaValue);
+        }
+        return new AnalyzedContent(analyzedInput, analyzedCriteriaValue);
+    }
+
+    public record AnalyzedContent(String analyzedInput, String analyzedCriteriaValue) {}
 
 }
