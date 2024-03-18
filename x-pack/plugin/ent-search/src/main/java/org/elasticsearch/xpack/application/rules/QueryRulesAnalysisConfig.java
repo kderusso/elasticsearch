@@ -10,20 +10,22 @@ package org.elasticsearch.xpack.application.rules;
 import java.util.List;
 import java.util.Map;
 
-public record QueryRulesAnalysisConfig(String analyzer, String tokenizer, List<String> filters) {
+public record QueryRulesAnalysisConfig(String index, String analyzer, String tokenizer, List<String> filters) {
 
-    public QueryRulesAnalysisConfig(String analyzer, String tokenizer, List<String> filters) {
-        this.analyzer = analyzer;
-        this.tokenizer = tokenizer;
-        this.filters = filters == null ? List.of() : filters;
-    }
+    // public QueryRulesAnalysisConfig(String index, String analyzer, String tokenizer, List<String> filters) {
+    // this.index = index;
+    // this.analyzer = analyzer;
+    // this.tokenizer = tokenizer;
+    // this.filters = filters == null ? List.of() : filters;
+    // }
 
     public static QueryRulesAnalysisConfig fromMap(Map<String, Object> configurationAttributes) {
+        String index = (String) configurationAttributes.get("index");
         String analyzer = (String) configurationAttributes.get("analyzer");
         String tokenizer = (String) configurationAttributes.get("tokenizer");
         @SuppressWarnings("unchecked")
         List<String> filters = (List<String>) configurationAttributes.getOrDefault("filters", List.of());
-        return new QueryRulesAnalysisConfig(analyzer, tokenizer, filters);
+        return new QueryRulesAnalysisConfig(index, analyzer, tokenizer, filters);
 
     }
 

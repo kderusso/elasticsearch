@@ -32,11 +32,14 @@ public class QueryRulesAnalysisService {
         this.clientWithOrigin = new OriginSettingClient(client, ENT_SEARCH_ORIGIN);
     }
 
-    public String analyze(String index, String text, QueryRulesAnalysisConfig analysisConfig) {
+    public String analyze(String text, QueryRulesAnalysisConfig analysisConfig) {
         String analyzer = analysisConfig.analyzer();
         String tokenizer = analysisConfig.tokenizer();
         List<String> filters = analysisConfig.filters();
-        AnalyzeAction.Request analyzeRequest = new AnalyzeAction.Request().text(text).index(index);
+        AnalyzeAction.Request analyzeRequest = new AnalyzeAction.Request().text(text);
+        if (analysisConfig.index() != null) {
+            analyzeRequest.index(analysisConfig.index());
+        }
         if (analyzer != null) {
             analyzeRequest.analyzer(analyzer);
         }
@@ -51,13 +54,13 @@ public class QueryRulesAnalysisService {
         return analyzeTokens.stream().map(AnalyzeAction.AnalyzeToken::getTerm).collect(Collectors.joining(" "));
     }
 
-    public AnalyzedContent analyzeContent(List<Map<String, Object>> analysisChain, String index, String input, String criteriaValue) {
+    public AnalyzedContent analyzeContent(List<Map<String, Object>> analysisChain, String input, String criteriaValue) {
         String analyzedInput = input;
         String analyzedCriteriaValue = criteriaValue;
         for (Map<String, Object> analysisConfig : analysisChain) {
             QueryRulesAnalysisConfig analysisConfigObj = QueryRulesAnalysisConfig.fromMap(analysisConfig);
-            analyzedInput = analyze(index, analyzedInput, analysisConfigObj);
-            analyzedCriteriaValue = analyze(index, analyzedCriteriaValue, analysisConfigObj);
+            analyzedInput = analyze(analyzedInput, analysisConfigObj);
+            analyzedCriteriaValue = analyze(analyzedCriteriaValue, analysisConfigObj);
             logger.info("analyzedInput: " + analyzedInput + "; analyzedCriteriaValue: " + analyzedCriteriaValue);
         }
         return new AnalyzedContent(analyzedInput, analyzedCriteriaValue);

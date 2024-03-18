@@ -221,11 +221,11 @@ public class QueryRuleCriteria implements Writeable, ToXContentObject {
         return Strings.toString(this);
     }
 
-    public boolean isMatch(Client client, String index, Object matchValue, QueryRuleCriteriaType matchType) {
-        return isMatch(client, index, matchValue, matchType, true);
+    public boolean isMatch(Client client, Object matchValue, QueryRuleCriteriaType matchType) {
+        return isMatch(client, matchValue, matchType, true);
     }
 
-    public boolean isMatch(Client client, String index, Object matchValue, QueryRuleCriteriaType matchType, boolean throwOnInvalidInput) {
+    public boolean isMatch(Client client, Object matchValue, QueryRuleCriteriaType matchType, boolean throwOnInvalidInput) {
         if (matchType == ALWAYS) {
             return true;
         }
@@ -236,7 +236,7 @@ public class QueryRuleCriteria implements Writeable, ToXContentObject {
                 return false;
             }
             QueryRulesAnalysisService analysisService = new QueryRulesAnalysisService(client);
-            boolean matchFound = matchType.isMatch(analysisService, index, matchString, criteriaValue, criteriaProperties);
+            boolean matchFound = matchType.isMatch(analysisService, matchString, criteriaValue, criteriaProperties);
             if (matchFound) {
                 return true;
             }

@@ -104,7 +104,6 @@ public enum QueryRuleCriteriaType {
 
     public boolean isMatch(
         QueryRulesAnalysisService analysisService,
-        String index,
         Object input,
         Object criteriaValue,
         Map<String, Object> criteriaProperties
@@ -114,7 +113,6 @@ public enum QueryRuleCriteriaType {
             List<Map<String, Object>> analysisChain = (List<Map<String, Object>>) criteriaProperties.get("analysis");
             QueryRulesAnalysisService.AnalyzedContent analyzedContent = analysisService.analyzeContent(
                 analysisChain,
-                index,
                 (String) input,
                 (String) criteriaValue
             );

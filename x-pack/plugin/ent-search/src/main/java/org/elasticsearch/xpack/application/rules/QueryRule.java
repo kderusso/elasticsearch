@@ -278,7 +278,7 @@ public class QueryRule implements Writeable, ToXContentObject {
     }
 
     @SuppressWarnings("unchecked")
-    public AppliedQueryRules applyRule(Client client, String index, AppliedQueryRules appliedRules, Map<String, Object> matchCriteria) {
+    public AppliedQueryRules applyRule(Client client, AppliedQueryRules appliedRules, Map<String, Object> matchCriteria) {
         if (type != QueryRule.QueryRuleType.PINNED) {
             throw new UnsupportedOperationException("Only pinned query rules are supported");
         }
@@ -295,7 +295,7 @@ public class QueryRule implements Writeable, ToXContentObject {
                 final String criteriaMetadata = criterion.criteriaMetadata();
 
                 if (criteriaType == ALWAYS || (criteriaMetadata != null && criteriaMetadata.equals(match))) {
-                    boolean singleCriterionMatches = criterion.isMatch(client, index, matchValue, criteriaType, false);
+                    boolean singleCriterionMatches = criterion.isMatch(client, matchValue, criteriaType, false);
                     isRuleMatch = (isRuleMatch == null) ? singleCriterionMatches : isRuleMatch && singleCriterionMatches;
                 }
             }
