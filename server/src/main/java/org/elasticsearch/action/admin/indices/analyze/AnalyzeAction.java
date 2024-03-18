@@ -141,6 +141,13 @@ public class AnalyzeAction extends ActionType<AnalyzeAction.Response> {
             return this;
         }
 
+        public Request addTokenFilters(List<String> tokenFilters) {
+            for (String tokenFilter : tokenFilters) {
+                this.tokenFilters.add(new NameOrDefinition(tokenFilter));
+            }
+            return this;
+        }
+
         public Request addTokenFilter(Map<String, ?> tokenFilter) {
             this.tokenFilters.add(new NameOrDefinition(tokenFilter));
             return this;

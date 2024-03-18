@@ -8,6 +8,7 @@
 package org.elasticsearch.xpack.application.rules;
 
 import org.elasticsearch.ElasticsearchParseException;
+import org.elasticsearch.client.internal.Client;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.io.stream.StreamInput;
@@ -277,7 +278,7 @@ public class QueryRule implements Writeable, ToXContentObject {
     }
 
     @SuppressWarnings("unchecked")
-    public AppliedQueryRules applyRule(AppliedQueryRules appliedRules, Map<String, Object> matchCriteria) {
+    public AppliedQueryRules applyRule(Client client, AppliedQueryRules appliedRules, Map<String, Object> matchCriteria) {
         if (type != QueryRule.QueryRuleType.PINNED) {
             throw new UnsupportedOperationException("Only pinned query rules are supported");
         }
@@ -294,7 +295,7 @@ public class QueryRule implements Writeable, ToXContentObject {
                 final String criteriaMetadata = criterion.criteriaMetadata();
 
                 if (criteriaType == ALWAYS || (criteriaMetadata != null && criteriaMetadata.equals(match))) {
-                    boolean singleCriterionMatches = criterion.isMatch(matchValue, criteriaType, false);
+                    boolean singleCriterionMatches = criterion.isMatch(client, matchValue, criteriaType, false);
                     isRuleMatch = (isRuleMatch == null) ? singleCriterionMatches : isRuleMatch && singleCriterionMatches;
                 }
             }

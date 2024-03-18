@@ -11,22 +11,51 @@ import org.apache.lucene.search.spell.LevenshteinDistance;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Defines the different types of query rule criteria and their rules for matching input against the criteria.
  */
 public enum QueryRuleCriteriaType {
+
     ALWAYS {
         @Override
-        public boolean isMatch(Object input, Object criteriaValue) {
+        public boolean isMatch(Object input, Object criteriaValue, Map<String, Object> criteriaProperties) {
             return true;
         }
     },
     EXACT {
         @Override
-        public boolean isMatch(Object input, Object criteriaValue) {
+        public boolean isMatch(Object input, Object criteriaValue, Map<String, Object> criteriaProperties) {
+            throw new UnsupportedOperationException("[" + this + "] criteria type requires analysis service");
+        }
+
+        @Override
+        public boolean isMatch(
+            QueryRulesAnalysisService analysisService,
+            Object input,
+            Object criteriaValue,
+            Map<String, Object> criteriaProperties
+        ) {
             if (input instanceof String && criteriaValue instanceof String) {
-                return input.equals(criteriaValue);
+
+                if (criteriaProperties.containsKey("analysis")) {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> analysisChain = (List<Map<String, Object>>) criteriaProperties.get("analysis");
+                    String analyzedInput = (String) input;
+                    String analyzedCriteriaValue = (String) criteriaValue;
+                    for (Map<String, Object> analysisConfig : analysisChain) {
+                        String tokenizer = analysisConfig.containsKey("tokenizer") ? (String) analysisConfig.get("tokenizer") : "keyword";
+                        String filter = analysisConfig.containsKey("filter") ? (String) analysisConfig.get("filter") : "lowercase";
+                        QueryRulesAnalysisConfig config = new QueryRulesAnalysisConfig(null, tokenizer, List.of(filter));
+                        analyzedInput = analysisService.analyze(analyzedInput, config);
+                        analyzedCriteriaValue = analysisService.analyze(analyzedCriteriaValue, config);
+                    }
+                    return analyzedInput.equals(analyzedCriteriaValue);
+                } else {
+                    return input.equals(criteriaValue);
+                }
+
             } else {
                 return parseDouble(input) == parseDouble(criteriaValue);
             }
@@ -34,7 +63,7 @@ public enum QueryRuleCriteriaType {
     },
     FUZZY {
         @Override
-        public boolean isMatch(Object input, Object criteriaValue) {
+        public boolean isMatch(Object input, Object criteriaValue, Map<String, Object> criteriaProperties) {
             final LevenshteinDistance ld = new LevenshteinDistance();
             if (input instanceof String && criteriaValue instanceof String) {
                 return ld.getDistance((String) input, (String) criteriaValue) > 0.5f;
@@ -44,43 +73,43 @@ public enum QueryRuleCriteriaType {
     },
     PREFIX {
         @Override
-        public boolean isMatch(Object input, Object criteriaValue) {
+        public boolean isMatch(Object input, Object criteriaValue, Map<String, Object> criteriaProperties) {
             return ((String) input).startsWith((String) criteriaValue);
         }
     },
     SUFFIX {
         @Override
-        public boolean isMatch(Object input, Object criteriaValue) {
+        public boolean isMatch(Object input, Object criteriaValue, Map<String, Object> criteriaProperties) {
             return ((String) input).endsWith((String) criteriaValue);
         }
     },
     CONTAINS {
         @Override
-        public boolean isMatch(Object input, Object criteriaValue) {
+        public boolean isMatch(Object input, Object criteriaValue, Map<String, Object> criteriaProperties) {
             return ((String) input).contains((String) criteriaValue);
         }
     },
     LT {
         @Override
-        public boolean isMatch(Object input, Object criteriaValue) {
+        public boolean isMatch(Object input, Object criteriaValue, Map<String, Object> criteriaProperties) {
             return parseDouble(input) < parseDouble(criteriaValue);
         }
     },
     LTE {
         @Override
-        public boolean isMatch(Object input, Object criteriaValue) {
+        public boolean isMatch(Object input, Object criteriaValue, Map<String, Object> criteriaProperties) {
             return parseDouble(input) <= parseDouble(criteriaValue);
         }
     },
     GT {
         @Override
-        public boolean isMatch(Object input, Object criteriaValue) {
+        public boolean isMatch(Object input, Object criteriaValue, Map<String, Object> criteriaProperties) {
             return parseDouble(input) > parseDouble(criteriaValue);
         }
     },
     GTE {
         @Override
-        public boolean isMatch(Object input, Object criteriaValue) {
+        public boolean isMatch(Object input, Object criteriaValue, Map<String, Object> criteriaProperties) {
             validateInput(input);
             return parseDouble(input) >= parseDouble(criteriaValue);
         }
@@ -94,11 +123,20 @@ public enum QueryRuleCriteriaType {
         return isValid;
     }
 
-    public boolean validateInput(Object input) {
-        return validateInput(input, true);
+    public void validateInput(Object input) {
+        validateInput(input, true);
     }
 
-    public abstract boolean isMatch(Object input, Object criteriaValue);
+    public abstract boolean isMatch(Object input, Object criteriaValue, Map<String, Object> criteriaProperties);
+
+    public boolean isMatch(
+        QueryRulesAnalysisService analysisService,
+        Object input,
+        Object criteriaValue,
+        Map<String, Object> criteriaProperties
+    ) {
+        return isMatch(input, criteriaValue, criteriaProperties);
+    }
 
     public static QueryRuleCriteriaType type(String criteriaType) {
         for (QueryRuleCriteriaType type : values()) {
