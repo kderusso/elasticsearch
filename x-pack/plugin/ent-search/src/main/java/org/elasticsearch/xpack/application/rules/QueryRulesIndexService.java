@@ -60,9 +60,10 @@ import static org.elasticsearch.xpack.core.ClientHelper.ENT_SEARCH_ORIGIN;
 public class QueryRulesIndexService {
     private static final Logger logger = LogManager.getLogger(QueryRulesIndexService.class);
     public static final String QUERY_RULES_ALIAS_NAME = ".query-rules";
-    public static final String QUERY_RULES_CONCRETE_INDEX_NAME = ".query-rules-1";
+    private static final int QUERY_RULES_INDEX_MAPPINGS_VERSION = 2;
+    public static final String QUERY_RULES_INDEX_PREFIX = ".query-rules-";
+    public static final String QUERY_RULES_CONCRETE_INDEX_NAME = QUERY_RULES_INDEX_PREFIX + QUERY_RULES_INDEX_MAPPINGS_VERSION;
     public static final String QUERY_RULES_INDEX_NAME_PATTERN = ".query-rules-*";
-    private static final int QUERY_RULES_INDEX_MAPPINGS_VERSION = 1;
     private final Client clientWithOrigin;
     private final ClusterSettings clusterSettings;
 
@@ -79,15 +80,32 @@ public class QueryRulesIndexService {
     public static SystemIndexDescriptor getSystemIndexDescriptor() {
         return SystemIndexDescriptor.builder()
             .setIndexPattern(QUERY_RULES_INDEX_NAME_PATTERN)
-            .setPrimaryIndex(QUERY_RULES_CONCRETE_INDEX_NAME)
+            .setPrimaryIndex(QUERY_RULES_INDEX_PREFIX + (QUERY_RULES_INDEX_MAPPINGS_VERSION - 1))
             .setDescription("Contains query ruleset configuration for query rules")
-            .setMappings(getIndexMappings())
+            .setMappings(getIndexMappings(QUERY_RULES_INDEX_MAPPINGS_VERSION))
             .setSettings(getIndexSettings())
             .setAliasName(QUERY_RULES_ALIAS_NAME)
             .setVersionMetaKey("version")
             .setOrigin(ENT_SEARCH_ORIGIN)
             .setThreadPools(ExecutorNames.DEFAULT_SYSTEM_INDEX_THREAD_POOLS)
+            .setPriorSystemIndexDescriptors(priorSystemIndexDescriptors())
             .build();
+    }
+
+    private static List<SystemIndexDescriptor> priorSystemIndexDescriptors() {
+        return List.of(
+            SystemIndexDescriptor.builder()
+                .setIndexPattern(QUERY_RULES_INDEX_NAME_PATTERN)
+                .setPrimaryIndex(QUERY_RULES_CONCRETE_INDEX_NAME)
+                .setDescription("Contains query ruleset configuration for query rules")
+                .setMappings(getIndexMappings(QUERY_RULES_INDEX_MAPPINGS_VERSION - 1))
+                .setSettings(getIndexSettings())
+                .setAliasName(QUERY_RULES_ALIAS_NAME)
+                .setVersionMetaKey("version")
+                .setOrigin(ENT_SEARCH_ORIGIN)
+                .setThreadPools(ExecutorNames.DEFAULT_SYSTEM_INDEX_THREAD_POOLS)
+                .build()
+        );
     }
 
     private static Settings getIndexSettings() {
@@ -100,7 +118,7 @@ public class QueryRulesIndexService {
             .build();
     }
 
-    private static XContentBuilder getIndexMappings() {
+    private static XContentBuilder getIndexMappings(int version) {
         try {
             final XContentBuilder builder = jsonBuilder();
             builder.startObject();
@@ -144,10 +162,12 @@ public class QueryRulesIndexService {
                             builder.field("enabled", false);
                             builder.endObject();
 
-                            builder.startObject(QueryRuleCriteria.PROPERTIES_FIELD.getPreferredName());
-                            builder.field("type", "object");
-                            builder.field("enabled", false);
-                            builder.endObject();
+                            if (version > 1) {
+                                builder.startObject(QueryRuleCriteria.PROPERTIES_FIELD.getPreferredName());
+                                builder.field("type", "object");
+                                builder.field("enabled", false);
+                                builder.endObject();
+                            }
                         }
                         builder.endObject();
                         builder.endObject();
