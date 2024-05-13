@@ -49,6 +49,8 @@ import static org.elasticsearch.xpack.searchbusinessrules.PinnedQueryBuilder.MAX
  */
 public class QueryRule implements Writeable, ToXContentObject {
 
+    public ParseField ACTIONS_VALUES = new ParseField("action_values");
+
     private final String id;
     private final QueryRuleType type;
     private final List<QueryRuleCriteria> criteria;
@@ -117,10 +119,11 @@ public class QueryRule implements Writeable, ToXContentObject {
         if (type == QueryRuleType.PINNED) {
             boolean ruleContainsPinnedIds = actions.containsKey(IDS_FIELD.getPreferredName());
             boolean ruleContainsPinnedDocs = actions.containsKey(DOCS_FIELD.getPreferredName());
+            boolean ruleContainsPinnedActionValues = actions.containsKey(ACTIONS_VALUES.getPreferredName());
             if (ruleContainsPinnedIds ^ ruleContainsPinnedDocs) {
                 validatePinnedAction(actions.get(IDS_FIELD.getPreferredName()));
                 validatePinnedAction(actions.get(DOCS_FIELD.getPreferredName()));
-            } else {
+            } else if (ruleContainsPinnedActionValues == false) {
                 throw new ElasticsearchParseException("pinned query rule actions must contain only one of either ids or docs");
             }
         } else {
@@ -285,6 +288,7 @@ public class QueryRule implements Writeable, ToXContentObject {
         List<String> matchingPinnedIds = new ArrayList<>();
         List<PinnedQueryBuilder.Item> matchingPinnedDocs = new ArrayList<>();
         Boolean isRuleMatch = null;
+        QueryRuleCriteria.ActionsWithValues matchingAction = null;
 
         // All specified criteria in a rule must match for the rule to be applied
         for (QueryRuleCriteria criterion : criteria) {
@@ -293,8 +297,31 @@ public class QueryRule implements Writeable, ToXContentObject {
                 final QueryRuleCriteriaType criteriaType = criterion.criteriaType();
                 final String criteriaMetadata = criterion.criteriaMetadata();
 
-                if (criteriaType == ALWAYS || (criteriaMetadata != null && criteriaMetadata.equals(match))) {
-                    boolean singleCriterionMatches = criterion.isMatch(matchValue, criteriaType, false);
+                if (criteriaType == ALWAYS
+                    || (criteriaMetadata != null && criteriaMetadata.equals(match))
+                    || actions.containsKey(ACTIONS_VALUES.getPreferredName())) {
+                    boolean singleCriterionMatches = false;
+                    if (criterion.criteriaValues() != null) {
+                        singleCriterionMatches = criterion.isMatch(matchValue, criteriaType, false);
+                    } else {
+                        List<Map<String, Object>> actionsWithValuesList = (List<Map<String, Object>>) actions.get(
+                            ACTIONS_VALUES.getPreferredName()
+                        );
+                        for (Map<String, Object> actionsWithValuesObj : actionsWithValuesList) {
+                            QueryRuleCriteria.ActionsWithValues actionsWithValues = new QueryRuleCriteria.ActionsWithValues(
+                                (List<String>) actionsWithValuesObj.get("values"),
+                                (Map<String, Object>) actionsWithValuesObj.get("actions")
+                            );
+                            // for (Object action : actionsWithValues.values()) {
+                            singleCriterionMatches = criterion.isActionMatch(actionsWithValues, matchValue, criteriaType, false);
+                            if (singleCriterionMatches) {
+                                matchingAction = actionsWithValues;
+                                break;
+                            }
+                            // }
+                        }
+                    }
+
                     isRuleMatch = (isRuleMatch == null) ? singleCriterionMatches : isRuleMatch && singleCriterionMatches;
                 }
             }
@@ -314,6 +341,22 @@ public class QueryRule implements Writeable, ToXContentObject {
                     )
                     .toList();
                 matchingPinnedDocs.addAll(items);
+            } else if (matchingAction != null) {
+                if (matchingAction.actions().containsKey(IDS_FIELD.getPreferredName())) {
+                    matchingPinnedIds.addAll((List<String>) matchingAction.actions().get(IDS_FIELD.getPreferredName()));
+                } else if (matchingAction.actions().containsKey(DOCS_FIELD.getPreferredName())) {
+                    List<Map<String, String>> docsToPin = (List<Map<String, String>>) matchingAction.actions()
+                        .get(DOCS_FIELD.getPreferredName());
+                    List<PinnedQueryBuilder.Item> items = docsToPin.stream()
+                        .map(
+                            map -> new PinnedQueryBuilder.Item(
+                                map.get(INDEX_FIELD.getPreferredName()),
+                                map.get(PinnedQueryBuilder.Item.ID_FIELD.getPreferredName())
+                            )
+                        )
+                        .toList();
+                    matchingPinnedDocs.addAll(items);
+                }
             }
         }
 

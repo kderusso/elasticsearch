@@ -29,6 +29,7 @@ import org.elasticsearch.xcontent.XContentType;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import static org.elasticsearch.xcontent.ConstructingObjectParser.constructorArg;
@@ -60,9 +61,9 @@ public class QueryRuleCriteria implements Writeable, ToXContentObject {
             if (Strings.isNullOrEmpty(criteriaMetadata)) {
                 throw new IllegalArgumentException("criteriaMetadata cannot be blank");
             }
-            if (criteriaValues == null || criteriaValues.isEmpty()) {
-                throw new IllegalArgumentException("criteriaValues cannot be null or empty");
-            }
+            // if (criteriaValues == null || criteriaValues.isEmpty()) {
+            // throw new IllegalArgumentException("criteriaValues cannot be null or empty");
+            // }
         }
 
         this.criteriaMetadata = criteriaMetadata;
@@ -194,21 +195,53 @@ public class QueryRuleCriteria implements Writeable, ToXContentObject {
         return isMatch(matchValue, matchType, true);
     }
 
+    public boolean isActionMatch(
+        ActionsWithValues actionsWithValues,
+        Object matchValue,
+        QueryRuleCriteriaType matchType,
+        boolean throwOnInvalidInput
+    ) {
+        if (matchType == ALWAYS) {
+            return true;
+        }
+
+        if (matchValue != null && actionsWithValues != null) {
+            for (String value : actionsWithValues.values) {
+                boolean isValue = matchType.validateInput(value, throwOnInvalidInput);
+                if (isValue == false) {
+                    return false;
+                }
+                boolean matchFound = matchType.isMatch(value, matchValue);
+                if (matchFound) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     public boolean isMatch(Object matchValue, QueryRuleCriteriaType matchType, boolean throwOnInvalidInput) {
         if (matchType == ALWAYS) {
             return true;
         }
-        final String matchString = matchValue.toString();
-        for (Object criteriaValue : criteriaValues) {
-            boolean isValid = matchType.validateInput(matchValue, throwOnInvalidInput);
-            if (isValid == false) {
-                return false;
-            }
-            boolean matchFound = matchType.isMatch(matchString, criteriaValue);
-            if (matchFound) {
-                return true;
+
+        if (matchValue != null && criteriaValues != null) {
+            final String matchString = matchValue.toString();
+            for (Object criteriaValue : criteriaValues) {
+                boolean isValid = matchType.validateInput(matchValue, throwOnInvalidInput);
+                if (isValid == false) {
+                    return false;
+                }
+                boolean matchFound = matchType.isMatch(matchString, criteriaValue);
+                if (matchFound) {
+                    return true;
+                }
             }
         }
+
         return false;
     }
+
+    public record ActionsWithValues(List<String> values, Map<String, Object> actions) {}
 }
