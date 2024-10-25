@@ -1,5 +1,6 @@
 [[full-text-filter-tutorial]]
 == Basic full-text search and filtering in {es}
+
 ++++
 <titleabbrev>Basics: Full-text search and filtering</titleabbrev>
 ++++
@@ -91,15 +92,18 @@ PUT /cooking_blog/_mapping
 }
 ----
 // TEST
-<1> The `standard` analyzer is used by default for `text` fields if an `analyzer` isn't specified. It's included here for demonstration purposes.
-<2> <<multi-fields,Multi-fields>> are used to index `text` fields as both `text` and `keyword` <<mapping-types,data types>>. This enables both full-text search and exact matching/filtering on the same field.
+<1> The `standard` analyzer is used by default for `text` fields if an `analyzer` isn't specified.
+It's included here for demonstration purposes.
+<2> <<multi-fields,Multi-fields>> are used to index `text` fields as both `text` and `keyword` <<mapping-types,data types>>.
+This enables both full-text search and exact matching/filtering on the same field.
 Note that if you used <<dynamic-field-mapping,dynamic mapping>>, these multi-fields would be created automatically.
-<3> The <<ignore-above,`ignore_above` parameter>> prevents indexing values longer than 256 characters in the `keyword` field. Again this is the default value, but it's included here for for demonstration purposes.
+<3> The <<ignore-above,`ignore_above` parameter>> prevents indexing values longer than 256 characters in the `keyword` field.
+Again this is the default value, but it's included here for for demonstration purposes.
 It helps to save disk space and avoid potential issues with Lucene's term byte-length limit.
 
 [TIP]
 ====
-Full-text search is powered by <<analysis,text analysis>>. 
+Full-text search is powered by <<analysis,text analysis>>.
 Text analysis normalizes and standardizes text data so it can be efficiently stored in an inverted index and searched in near real-time.
 Analysis happens at both <<analysis-index-search-time,index and search time>>.
 This tutorial won't cover analysis in detail, but it's important to understand how text is processed to create effective search queries.
@@ -158,9 +162,12 @@ GET /cooking_blog/_search
 }
 ----
 // TEST[continued]
-<1> By default, the `match` query uses `OR` logic between the resulting tokens. This means it will match documents that contain either "fluffy" or "pancakes", or both, in the description field.
+<1> By default, the `match` query uses `OR` logic between the resulting tokens.
+This means it will match documents that contain either "fluffy" or "pancakes", or both, in the description field.
 
-At search time, {es} defaults to the analyzer defined in the field mapping. In this example, we're using the `standard` analyzer. Using a different analyzer at search time is an <<different-analyzers,advanced use case>>.
+At search time, {es} defaults to the analyzer defined in the field mapping.
+In this example, we're using the `standard` analyzer.
+Using a different analyzer at search time is an <<different-analyzers,advanced use case>>.
 
 .Example response
 [%collapsible]
@@ -178,7 +185,7 @@ At search time, {es} defaults to the analyzer defined in the field mapping. In t
  },
  "hits": { <1>
    "total": {
-     "value": 1, 
+     "value": 1,
      "relation": "eq"
    },
    "max_score": 0.39556286, <2>
@@ -191,7 +198,7 @@ At search time, {es} defaults to the analyzer defined in the field mapping. In t
          "title": "Perfect Pancakes: A Fluffy Breakfast Delight", <4>
          "description": "Learn the secrets to making the fluffiest pancakes, so amazing you won't believe your tastebuds. This recipe uses buttermilk and a special folding technique to create light, airy pancakes that are perfect for lazy Sunday mornings.", <5>
          "author": "Maria Rodriguez",
-         "date": "2023-05-01", 
+         "date": "2023-05-01",
          "category": "Breakfast",
          "tags": [
            "pancakes",
@@ -211,9 +218,13 @@ At search time, {es} defaults to the analyzer defined in the field mapping. In t
 // TESTRESPONSE[s/"value": 1/"value": $body.hits.total.value/]
 // TESTRESPONSE[s/"max_score": 0.39556286/"max_score": $body.hits.max_score/]
 // TESTRESPONSE[s/"_score": 0.39556286/"_score": $body.hits.hits.0._score/]
-<1> The `hits` object contains the total number of matching documents and their relation to the total. Refer to <<track-total-hits,Track total hits>> for more details about the `hits` object.
-<2> `max_score` is the highest relevance score among all matching documents. In this example, we only have one matching document.
-<3> `_score` is the relevance score for a specific document, indicating how well it matches the query. Higher scores indicate better matches. In this example the `max_score` is the same as the `_score`, as there is only one matching document.
+<1> The `hits` object contains the total number of matching documents and their relation to the total.
+Refer to <<track-total-hits,Track total hits>> for more details about the `hits` object.
+<2> `max_score` is the highest relevance score among all matching documents.
+In this example, we only have one matching document.
+<3> `_score` is the relevance score for a specific document, indicating how well it matches the query.
+Higher scores indicate better matches.
+In this example the `max_score` is the same as the `_score`, as there is only one matching document.
 <4> The title contains both "Fluffy" and "Pancakes", matching our search terms exactly.
 <5> The description includes "fluffiest" and "pancakes", further contributing to the document's relevance due to the analysis process.
 ==============
@@ -264,7 +275,7 @@ GET /cooking_blog/_search
   }
 }
 ----
-// TEST[continued]
+// TESTRESPONSE[s/"took": 1/"took": "$body.took"/]
 ==============
 
 [discrete]
@@ -314,9 +325,11 @@ GET /cooking_blog/_search
 ----
 // TEST[continued]
 
-This query searches for "vegetarian curry" across the title, description, and tags fields. Each field is treated with equal importance.
+This query searches for "vegetarian curry" across the title, description, and tags fields.
+Each field is treated with equal importance.
 
-However, in many cases, matches in certain fields (like the title) might be more relevant than others. We can adjust the importance of each field using field boosting:
+However, in many cases, matches in certain fields (like the title) might be more relevant than others.
+We can adjust the importance of each field using field boosting:
 
 [source,console]
 ----
@@ -385,8 +398,12 @@ Learn more about fields and per-field boosting in the <<query-dsl-multi-match-qu
   }
 }
 ----
-// TEST[continued]
-<1> The title contains "Vegetarian" and "Curry", which matches our search terms. The title field has the highest boost (^3), contributing significantly to this document's relevance score.
+// TESTRESPONSE[s/"took" : 5/"took": "$body.took"/]
+// TESTRESPONSE[s/"_score" : 1.8234354/"_score": $body.hits.hits.0._score/]
+// TESTRESPONSE[s/"max_score" : 1.8234354/"max_score": $body.hits.max_score/]
+
+<1> The title contains "Vegetarian" and "Curry", which matches our search terms.
+The title field has the highest boost (^3), contributing significantly to this document's relevance score.
 <2> The description contains "curry" and related terms like "vegetables", further increasing the document's relevance.
 <3> The tags include both "vegetarian" and "curry", providing an exact match for our search terms, albeit with no boost.
 
@@ -396,7 +413,8 @@ Even though the exact phrase "vegetarian curry" doesn't appear in any single fie
 
 [TIP]
 ====
-The `multi_match` query is often recommended over a single `match` query for most text search use cases, as it provides more flexibility and better matches user expectations. It won't work if the multi-field mapping isn't enabled.
+The `multi_match` query is often recommended over a single `match` query for most text search use cases, as it provides more flexibility and better matches user expectations.
+It won't work if the multi-field mapping isn't enabled.
 ====
 
 [discrete]
@@ -423,14 +441,18 @@ GET /cooking_blog/_search
 }
 ----
 // TEST[continued]
-<1> Note the use of `category.keyword` here. This refers to the <<keyword, `keyword`>> multi-field of the `category` field, ensuring an exact, case-sensitive match.
+<1> Note the use of `category.keyword` here.
+This refers to the <<keyword, `keyword`>> multi-field of the `category` field, ensuring an exact, case-sensitive match.
 
 [TIP]
 ====
-The `.keyword` suffix accesses the unanalyzed version of a field, enabling exact, case-sensitive matching. This works in two scenarios:
+The `.keyword` suffix accesses the unanalyzed version of a field, enabling exact, case-sensitive matching.
+This works in two scenarios:
 
-1. *When using dynamic mapping for text fields*. Elasticsearch automatically creates a `.keyword` sub-field.
-2. *When text fields are explicitly mapped with a `.keyword` sub-field*. For example, we explicitly mapped the `category` field in <<full-text-filter-tutorial-create-index,Step 1>> of this tutorial.
+1. *When using dynamic mapping for text fields*.
+Elasticsearch automatically creates a `.keyword` sub-field.
+2. *When text fields are explicitly mapped with a `.keyword` sub-field*.
+For example, we explicitly mapped the `category` field in <<full-text-filter-tutorial-create-index,Step 1>> of this tutorial.
 ====
 
 [discrete]
@@ -480,7 +502,8 @@ GET /cooking_blog/_search
 }
 ----
 // TEST[continued]
-<1> The `term` query has zero flexibility. For example, here the queries `maria` or `maria rodriguez` would have zero hits, due to case sensitivity.
+<1> The `term` query has zero flexibility.
+For example, here the queries `maria` or `maria rodriguez` would have zero hits, due to case sensitivity.
 
 [TIP]
 ====
@@ -554,7 +577,8 @@ GET /cooking_blog/_search
 }
 ----
 // TEST[continued]
-<1> The `must_not` clause excludes documents that match the specified criteria. This is a powerful tool for filtering out unwanted results.
+<1> The `must_not` clause excludes documents that match the specified criteria.
+This is a powerful tool for filtering out unwanted results.
 
 .Example response
 [%collapsible]
@@ -600,6 +624,9 @@ GET /cooking_blog/_search
   }
 }
 ----
+// TESTRESPONSE[s/"took": 1/"took": "$body.took"/]
+// TESTRESPONSE[s/"_score": 7.9835095/"_score": $body.hits.hits.0._score/]
+// TESTRESPONSE[s/"max_score": 7.9835095/"max_score": $body.hits.max_score/]
 // TEST[continued]
 <1> The title contains "Spicy", matching one of our `should` conditions and contributing to a higher relevance score.
 <2> The description includes "curry", further increasing the document's relevance.
