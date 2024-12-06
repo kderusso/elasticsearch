@@ -37,6 +37,8 @@ public final class InferenceFieldMetadata implements SimpleDiffable<InferenceFie
     private static final String SEARCH_INFERENCE_ID_FIELD = "search_inference_id";
     private static final String SOURCE_FIELDS_FIELD = "source_fields";
 
+    private static final String NESTED_CHUNKED_EMBEDDINGS_FIELD_IDENTIFIER = ".inference.chunks.embeddings";
+
     private final String name;
     private final String inferenceId;
     private final String searchInferenceId;
@@ -106,6 +108,10 @@ public final class InferenceFieldMetadata implements SimpleDiffable<InferenceFie
 
     public String[] getSourceFields() {
         return sourceFields;
+    }
+
+    public String getNestedChunkedEmbeddingsField() {
+        return name + NESTED_CHUNKED_EMBEDDINGS_FIELD_IDENTIFIER;
     }
 
     public static Diff<InferenceFieldMetadata> readDiffFrom(StreamInput in) throws IOException {

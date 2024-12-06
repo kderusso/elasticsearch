@@ -68,6 +68,11 @@ public class InterceptedQueryBuilderWrapper<T extends AbstractQueryBuilder<T>> e
     }
 
     @Override
+    public String getName() {
+        return queryBuilder.getName();
+    }
+
+    @Override
     public TransportVersion getMinimalSupportedVersion() {
         return queryBuilder.getMinimalSupportedVersion();
     }

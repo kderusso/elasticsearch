@@ -52,6 +52,7 @@ import org.elasticsearch.xpack.core.inference.action.GetInferenceServicesAction;
 import org.elasticsearch.xpack.core.inference.action.InferenceAction;
 import org.elasticsearch.xpack.core.inference.action.PutInferenceModelAction;
 import org.elasticsearch.xpack.core.inference.action.UpdateInferenceModelAction;
+import org.elasticsearch.xpack.core.ml.search.SparseVectorQueryRewriteInterceptor;
 import org.elasticsearch.xpack.inference.action.TransportDeleteInferenceEndpointAction;
 import org.elasticsearch.xpack.inference.action.TransportGetInferenceDiagnosticsAction;
 import org.elasticsearch.xpack.inference.action.TransportGetInferenceModelAction;
@@ -408,7 +409,7 @@ public class InferencePlugin extends Plugin implements ActionPlugin, ExtensibleP
 
     @Override
     public List<QueryRewriteInterceptor> getQueryRewriteInterceptors() {
-        return List.of(new SemanticMatchQueryRewriteInterceptor());
+        return List.of(new SemanticMatchQueryRewriteInterceptor(), new SparseVectorQueryRewriteInterceptor());
     }
 
     @Override

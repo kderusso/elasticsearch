@@ -143,6 +143,14 @@ public class SparseVectorQueryBuilder extends AbstractQueryBuilder<SparseVectorQ
         return queryVectors;
     }
 
+    public String getInferenceId() {
+        return inferenceId;
+    }
+
+    public String getQuery() {
+        return query;
+    }
+
     public boolean shouldPruneTokens() {
         return shouldPruneTokens;
     }
@@ -167,7 +175,6 @@ public class SparseVectorQueryBuilder extends AbstractQueryBuilder<SparseVectorQ
 
     @Override
     protected void doXContent(XContentBuilder builder, Params params) throws IOException {
-        builder.startObject(NAME);
         builder.field(FIELD_FIELD.getPreferredName(), fieldName);
         if (queryVectors != null) {
             builder.startObject(QUERY_VECTOR_FIELD.getPreferredName());
@@ -184,7 +191,6 @@ public class SparseVectorQueryBuilder extends AbstractQueryBuilder<SparseVectorQ
             builder.field(PRUNING_CONFIG_FIELD.getPreferredName(), tokenPruningConfig);
         }
         boostAndQueryNameToXContent(builder);
-        builder.endObject();
     }
 
     @Override
