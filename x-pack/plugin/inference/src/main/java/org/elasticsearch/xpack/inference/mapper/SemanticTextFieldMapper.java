@@ -62,6 +62,7 @@ import org.elasticsearch.inference.ChunkingSettings;
 import org.elasticsearch.inference.InferenceResults;
 import org.elasticsearch.inference.MinimalServiceSettings;
 import org.elasticsearch.inference.SimilarityMeasure;
+import org.elasticsearch.logging.LogManager;
 import org.elasticsearch.search.fetch.StoredFieldsSpec;
 import org.elasticsearch.search.lookup.Source;
 import org.elasticsearch.search.vectors.KnnVectorQueryBuilder;
@@ -75,6 +76,7 @@ import org.elasticsearch.xpack.core.ml.inference.results.MlTextEmbeddingResults;
 import org.elasticsearch.xpack.core.ml.inference.results.TextExpansionResults;
 import org.elasticsearch.xpack.core.ml.search.SparseVectorQueryBuilder;
 import org.elasticsearch.xpack.inference.highlight.SemanticTextHighlighter;
+import org.elasticsearch.xpack.inference.registry.ModelRegistry;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -139,6 +141,12 @@ public class SemanticTextFieldMapper extends FieldMapper implements InferenceFie
             }
             notFromDynamicTemplates(type).accept(n, c);
         };
+    }
+
+    private static ModelRegistry modelRegistry;
+
+    public static void setModelRegistry(ModelRegistry registry) {
+        modelRegistry = registry;
     }
 
     public static class Builder extends FieldMapper.Builder {
@@ -267,6 +275,15 @@ public class SemanticTextFieldMapper extends FieldMapper implements InferenceFie
             if (modelSettings.get() != null) {
                 validateServiceSettings(modelSettings.get());
             }
+
+            MinimalServiceSettings minimalServiceSettings = modelRegistry.getMinimalServiceSettings(
+                inferenceId.getValue(),
+                context.clusterState()
+            );
+            // Demonstrate settings
+            LogManager.getLogger(SemanticTextFieldMapper.class)
+                .info("Using model settings [{}] for inference id [{}]", minimalServiceSettings, inferenceId.getValue());
+
             final String fullName = context.buildFullName(leafName());
 
             if (context.isInNestedContext()) {

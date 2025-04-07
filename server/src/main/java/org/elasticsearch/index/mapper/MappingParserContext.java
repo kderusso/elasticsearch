@@ -12,6 +12,7 @@ package org.elasticsearch.index.mapper;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.join.BitSetProducer;
 import org.elasticsearch.TransportVersion;
+import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.time.DateFormatter;
 import org.elasticsearch.index.IndexSettings;
@@ -34,6 +35,7 @@ public class MappingParserContext {
     private final Function<String, Mapper.TypeParser> typeParsers;
     private final Function<String, RuntimeField.Parser> runtimeFieldParsers;
     private final IndexVersion indexVersionCreated;
+    private final Supplier<ClusterState> clusterState;
     private final Supplier<TransportVersion> clusterTransportVersion;
     private final Supplier<SearchExecutionContext> searchExecutionContextSupplier;
     private final ScriptCompiler scriptCompiler;
@@ -49,6 +51,7 @@ public class MappingParserContext {
         Function<String, Mapper.TypeParser> typeParsers,
         Function<String, RuntimeField.Parser> runtimeFieldParsers,
         IndexVersion indexVersionCreated,
+        Supplier<ClusterState> clusterState,
         Supplier<TransportVersion> clusterTransportVersion,
         Supplier<SearchExecutionContext> searchExecutionContextSupplier,
         ScriptCompiler scriptCompiler,
@@ -61,6 +64,7 @@ public class MappingParserContext {
         this.typeParsers = typeParsers;
         this.runtimeFieldParsers = runtimeFieldParsers;
         this.indexVersionCreated = indexVersionCreated;
+        this.clusterState = clusterState;
         this.clusterTransportVersion = clusterTransportVersion;
         this.searchExecutionContextSupplier = searchExecutionContextSupplier;
         this.scriptCompiler = scriptCompiler;
@@ -101,6 +105,10 @@ public class MappingParserContext {
 
     public IndexVersion indexVersionCreated() {
         return indexVersionCreated;
+    }
+
+    public Supplier<ClusterState> clusterState() {
+        return clusterState;
     }
 
     public Supplier<TransportVersion> clusterTransportVersion() {
@@ -164,6 +172,7 @@ public class MappingParserContext {
                 in.typeParsers,
                 in.runtimeFieldParsers,
                 in.indexVersionCreated,
+                in.clusterState,
                 in.clusterTransportVersion,
                 in.searchExecutionContextSupplier,
                 in.scriptCompiler,
@@ -194,6 +203,7 @@ public class MappingParserContext {
                 in.typeParsers,
                 in.runtimeFieldParsers,
                 in.indexVersionCreated,
+                in.clusterState,
                 in.clusterTransportVersion,
                 in.searchExecutionContextSupplier,
                 in.scriptCompiler,

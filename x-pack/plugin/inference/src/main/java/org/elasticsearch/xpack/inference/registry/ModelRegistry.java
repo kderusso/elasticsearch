@@ -224,11 +224,19 @@ public class ModelRegistry implements ClusterStateListener {
      * @throws ResourceNotFoundException if the specified id is guaranteed to not exist in the cluster.
      */
     public MinimalServiceSettings getMinimalServiceSettings(String inferenceEntityId) throws ResourceNotFoundException {
+        return getMinimalServiceSettings(inferenceEntityId, clusterService.state());
+    }
+
+    public MinimalServiceSettings getMinimalServiceSettings(String inferenceEntityId, ClusterState clusterState)
+        throws ResourceNotFoundException {
         var config = defaultConfigIds.get(inferenceEntityId);
         if (config != null) {
             return config.settings();
         }
-        var state = ModelRegistryMetadata.fromState(clusterService.state().projectState().metadata());
+        if (clusterState == null) {
+            return null;
+        }
+        var state = ModelRegistryMetadata.fromState(clusterState.projectState().metadata());
         var existing = state.getMinimalServiceSettings(inferenceEntityId);
         if (state.isUpgraded() && existing == null) {
             throw new ResourceNotFoundException(inferenceEntityId + " does not exist in this cluster.");

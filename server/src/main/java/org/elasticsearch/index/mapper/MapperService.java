@@ -12,6 +12,7 @@ package org.elasticsearch.index.mapper;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.join.BitSetProducer;
 import org.elasticsearch.TransportVersion;
+import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.metadata.IndexMetadata;
 import org.elasticsearch.cluster.metadata.MappingMetadata;
 import org.elasticsearch.cluster.service.ClusterService;
@@ -202,7 +203,8 @@ public class MapperService extends AbstractIndexComponent implements Closeable {
         MapperMetrics mapperMetrics
     ) {
         this(
-            () -> clusterService.state().getMinTransportVersion(),
+            () -> clusterService.state(),
+            () -> clusterService.state().getMinTransportVersion(), // TODO no longer needed as arg if we pass in cluster state directly
             indexSettings,
             indexAnalyzers,
             parserConfiguration,
@@ -218,6 +220,7 @@ public class MapperService extends AbstractIndexComponent implements Closeable {
 
     @SuppressWarnings("this-escape")
     public MapperService(
+        Supplier<ClusterState> clusterState,
         Supplier<TransportVersion> clusterTransportVersion,
         IndexSettings indexSettings,
         IndexAnalyzers indexAnalyzers,
@@ -239,6 +242,7 @@ public class MapperService extends AbstractIndexComponent implements Closeable {
             type -> mapperRegistry.getMapperParser(type, indexVersionCreated),
             mapperRegistry.getRuntimeFieldParsers()::get,
             indexVersionCreated,
+            clusterState,
             clusterTransportVersion,
             searchExecutionContextSupplier,
             scriptCompiler,

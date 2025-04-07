@@ -9,6 +9,7 @@
 
 package org.elasticsearch.index.mapper;
 
+import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.core.Nullable;
 import org.elasticsearch.index.mapper.MapperService.MergeReason;
@@ -145,5 +146,9 @@ public class MapperBuilderContext {
      */
     public boolean isInNestedContext() {
         return inNestedContext;
+    }
+
+    public ClusterState clusterState() {
+        return null;
     }
 }
