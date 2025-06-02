@@ -65,21 +65,26 @@ public class TextSimilarityRankFeaturePhaseRankCoordinatorContext extends RankFe
             InferenceServiceResults results = r.getResults();
             assert results instanceof RankedDocsResults;
 
-            // Ensure we get exactly as many scores as the number of docs we passed, otherwise we may return incorrect results
             List<RankedDocsResults.RankedDoc> rankedDocs = ((RankedDocsResults) results).getRankedDocs();
+            final float[] scores;
+            if (featureDocs.length > 0 && featureDocs[0].featureData != null && featureDocs[0].docIndices != null) {
+                scores = extractScoresFromInputs(rankedDocs, featureDocs);
+            } else {
+                scores = extractScoresFromRankedDocs(rankedDocs);
+            }
 
-            if (rankedDocs.size() != featureDocs.length) {
+            // Ensure we get exactly as many scores as the number of docs we passed, otherwise we may return incorrect results
+            if (scores.length != featureDocs.length) {
                 l.onFailure(
                     new IllegalStateException(
                         "Reranker input document count and returned score count mismatch: ["
                             + featureDocs.length
                             + "] vs ["
-                            + rankedDocs.size()
+                            + scores.length
                             + "]"
                     )
                 );
             } else {
-                float[] scores = extractScoresFromRankedDocs(rankedDocs);
                 l.onResponse(scores);
             }
         });
@@ -118,7 +123,7 @@ public class TextSimilarityRankFeaturePhaseRankCoordinatorContext extends RankFe
             if (featureDocs.length == 0) {
                 inferenceListener.onResponse(new InferenceAction.Response(new RankedDocsResults(List.of())));
             } else {
-                List<String> featureData = Arrays.stream(featureDocs).map(x -> x.featureData).toList();
+                List<String> featureData = Arrays.stream(featureDocs).map(x -> x.featureData).flatMap(List::stream).toList();
                 InferenceAction.Request inferenceRequest = generateRequest(featureData);
                 try {
                     executeAsyncWithOrigin(client, INFERENCE_ORIGIN, InferenceAction.INSTANCE, inferenceRequest, inferenceListener);
@@ -176,6 +181,32 @@ public class TextSimilarityRankFeaturePhaseRankCoordinatorContext extends RankFe
             scores[rankedDoc.index()] = rankedDoc.relevanceScore();
         }
         return scores;
+    }
+
+    private float[] extractScoresFromInputs(List<RankedDocsResults.RankedDoc> rankedDocs, RankFeatureDoc[] featureDocs) {
+        int[] docMappings = Arrays.stream(featureDocs).flatMapToInt(f -> f.docIndices.stream().mapToInt(Integer::intValue)).toArray();
+
+        float[] scores = new float[featureDocs.length];
+        boolean[] hasScore = new boolean[featureDocs.length];
+
+        for (int i = 0; i < rankedDocs.size(); i++) {
+            int docId = docMappings[i];
+            float score = rankedDocs.get(i).relevanceScore();
+
+            if (hasScore[docId] == false) {
+                scores[docId] = score;
+                hasScore[docId] = true;
+            } else {
+                scores[docId] = Math.max(scores[docId], score);
+            }
+        }
+
+        float[] result = new float[featureDocs.length];
+        for (int i = 0; i < featureDocs.length; i++) {
+            result[i] = hasScore[i] ? normalizeScore(scores[i]) : 0f;
+        }
+
+        return result;
     }
 
     private static float normalizeScore(float score) {

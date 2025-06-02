@@ -16,7 +16,10 @@ import org.elasticsearch.search.rank.RankDoc;
 import org.elasticsearch.xcontent.XContentBuilder;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
+
+import static org.elasticsearch.TransportVersions.RETRIEVER_RERANK_MULTIPLE_INPUT_MAX_SCORE;
 
 /**
  * A {@link RankDoc} that contains field data to be used later by the reranker on the coordinator node.
@@ -25,8 +28,9 @@ public class RankFeatureDoc extends RankDoc {
 
     public static final String NAME = "rank_feature_doc";
 
-    // TODO: update to support more than 1 fields; and not restrict to string data
-    public String featureData;
+    // TODO don't restrict to String data
+    public List<String> featureData;
+    public List<Integer> docIndices;
 
     public RankFeatureDoc(int doc, float score, int shardIndex) {
         super(doc, score, shardIndex);
@@ -34,7 +38,14 @@ public class RankFeatureDoc extends RankDoc {
 
     public RankFeatureDoc(StreamInput in) throws IOException {
         super(in);
-        featureData = in.readOptionalString();
+        if (in.getTransportVersion().before(RETRIEVER_RERANK_MULTIPLE_INPUT_MAX_SCORE)) {
+            String featureDataString = in.readOptionalString();
+            featureData = featureDataString == null ? List.of() : List.of(featureDataString);
+            docIndices = null;
+        } else {
+            featureData = in.readOptionalStringCollectionAsList();
+            docIndices = in.readOptionalCollectionAsList(StreamInput::readVInt);
+        }
     }
 
     @Override
@@ -42,24 +53,34 @@ public class RankFeatureDoc extends RankDoc {
         throw new UnsupportedOperationException("explain is not supported for {" + getClass() + "}");
     }
 
-    public void featureData(String featureData) {
+    public void featureData(List<String> featureData, List<Integer> docIndices) {
+        this.featureData = featureData;
+        this.docIndices = docIndices;
+    }
+
+    public void featureData(List<String> featureData) {
         this.featureData = featureData;
     }
 
     @Override
     protected void doWriteTo(StreamOutput out) throws IOException {
-        out.writeOptionalString(featureData);
+        if (out.getTransportVersion().before(RETRIEVER_RERANK_MULTIPLE_INPUT_MAX_SCORE)) {
+            out.writeOptionalString(featureData.isEmpty() ? null : featureData.get(0));
+        } else {
+            out.writeOptionalStringCollection(featureData);
+            out.writeOptionalCollection(docIndices, StreamOutput::writeVInt);
+        }
     }
 
     @Override
     protected boolean doEquals(RankDoc rd) {
         RankFeatureDoc other = (RankFeatureDoc) rd;
-        return Objects.equals(this.featureData, other.featureData);
+        return Objects.equals(this.featureData, other.featureData) && Objects.equals(this.docIndices, other.docIndices);
     }
 
     @Override
     protected int doHashCode() {
-        return Objects.hashCode(featureData);
+        return Objects.hash(featureData, docIndices);
     }
 
     @Override
@@ -69,6 +90,7 @@ public class RankFeatureDoc extends RankDoc {
 
     @Override
     protected void doToXContent(XContentBuilder builder, Params params) throws IOException {
-        builder.field("featureData", featureData);
+        builder.array("featureData", featureData.toArray(new String[0]));
+        builder.array("docIndices", docIndices.toArray(new String[0]));
     }
 }

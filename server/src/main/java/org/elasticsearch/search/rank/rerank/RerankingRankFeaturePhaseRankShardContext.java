@@ -20,6 +20,7 @@ import org.elasticsearch.search.rank.feature.RankFeatureDoc;
 import org.elasticsearch.search.rank.feature.RankFeatureShardResult;
 
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * The {@code ReRankingRankFeaturePhaseRankShardContext} is handles the {@code SearchHits} generated from the {@code RankFeatureShardPhase}
@@ -42,7 +43,7 @@ public class RerankingRankFeaturePhaseRankShardContext extends RankFeaturePhaseR
                 rankFeatureDocs[i] = new RankFeatureDoc(hits.getHits()[i].docId(), hits.getHits()[i].getScore(), shardId);
                 DocumentField docField = hits.getHits()[i].field(field);
                 if (docField != null) {
-                    rankFeatureDocs[i].featureData(docField.getValue().toString());
+                    rankFeatureDocs[i].featureData(List.of(docField.getValue().toString()));
                 }
             }
             return new RankFeatureShardResult(rankFeatureDocs);
