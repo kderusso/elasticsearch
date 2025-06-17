@@ -43,6 +43,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -238,5 +239,24 @@ public final class Utils {
 
     public static <K, V> Map<K, V> modifiableMap(Map<K, V> aMap) {
         return new HashMap<>(aMap);
+    }
+
+    public static class InferencePluginWithModelRegistry extends InferencePlugin {
+
+        private final ModelRegistry modelRegistry;
+
+        public InferencePluginWithModelRegistry(Settings settings, ModelRegistry modelRegistry) {
+            super(settings);
+            this.modelRegistry = modelRegistry;
+        }
+
+        public InferencePluginWithModelRegistry(Settings settings) {
+            this(settings, mock(ModelRegistry.class));
+        }
+
+        @Override
+        protected Supplier<ModelRegistry> getModelRegistry() {
+            return () -> modelRegistry;
+        }
     }
 }

@@ -69,6 +69,7 @@ import org.elasticsearch.inference.ChunkingSettings;
 import org.elasticsearch.inference.InferenceResults;
 import org.elasticsearch.inference.MinimalServiceSettings;
 import org.elasticsearch.inference.SimilarityMeasure;
+import org.elasticsearch.inference.TaskType;
 import org.elasticsearch.search.fetch.StoredFieldsSpec;
 import org.elasticsearch.search.lookup.Source;
 import org.elasticsearch.search.vectors.KnnVectorQueryBuilder;
@@ -166,19 +167,9 @@ public class SemanticTextFieldMapper extends FieldMapper implements InferenceFie
     public static class Builder extends FieldMapper.Builder {
         private final ModelRegistry modelRegistry;
         private final boolean useLegacyFormat;
+        private final IndexVersion indexVersionCreated;
 
-        private final Parameter<String> inferenceId = Parameter.stringParam(
-            INFERENCE_ID_FIELD,
-            false,
-            mapper -> ((SemanticTextFieldType) mapper.fieldType()).inferenceId,
-            DEFAULT_ELSER_2_INFERENCE_ID
-        ).addValidator(v -> {
-            if (Strings.isEmpty(v)) {
-                throw new IllegalArgumentException(
-                    "[" + INFERENCE_ID_FIELD + "] on mapper [" + leafName() + "] of type [" + CONTENT_TYPE + "] must not be empty"
-                );
-            }
-        }).alwaysSerialize();
+        private final Parameter<String> inferenceId;
 
         private final Parameter<String> searchInferenceId = Parameter.stringParam(
             SEARCH_INFERENCE_ID_FIELD,
@@ -203,15 +194,7 @@ public class SemanticTextFieldMapper extends FieldMapper implements InferenceFie
             Objects::toString
         ).acceptsNull().setMergeValidator(SemanticTextFieldMapper::canMergeModelSettings);
 
-        private final Parameter<SemanticTextIndexOptions> indexOptions = new Parameter<>(
-            INDEX_OPTIONS_FIELD,
-            true,
-            () -> null,
-            (n, c, o) -> parseIndexOptionsFromMap(n, o, c.indexVersionCreated()),
-            mapper -> ((SemanticTextFieldType) mapper.fieldType()).indexOptions,
-            XContentBuilder::field,
-            Objects::toString
-        ).acceptsNull();
+        private final Parameter<SemanticTextIndexOptions> indexOptions;
 
         @SuppressWarnings("unchecked")
         private final Parameter<ChunkingSettings> chunkingSettings = new Parameter<>(
@@ -246,8 +229,34 @@ public class SemanticTextFieldMapper extends FieldMapper implements InferenceFie
             ModelRegistry modelRegistry
         ) {
             super(name);
+
+            this.indexVersionCreated = indexSettings.getIndexVersionCreated();
             this.modelRegistry = modelRegistry;
             this.useLegacyFormat = InferenceMetadataFieldsMapper.isEnabled(indexSettings.getSettings()) == false;
+
+            this.inferenceId = Parameter.stringParam(
+                INFERENCE_ID_FIELD,
+                false,
+                mapper -> ((SemanticTextFieldType) mapper.fieldType()).inferenceId,
+                DEFAULT_ELSER_2_INFERENCE_ID
+            ).addValidator(v -> {
+                if (Strings.isEmpty(v)) {
+                    throw new IllegalArgumentException(
+                        "[" + INFERENCE_ID_FIELD + "] on mapper [" + leafName() + "] of type [" + CONTENT_TYPE + "] must not be empty"
+                    );
+                }
+            }).alwaysSerialize();
+
+            this.indexOptions = new Parameter<>(
+                INDEX_OPTIONS_FIELD,
+                true,
+                () -> defaultIndexOptions(indexVersionCreated, modelRegistry.getMinimalServiceSettings(inferenceId.get())),
+                (n, c, o) -> parseIndexOptionsFromMap(n, o, c.indexVersionCreated()),
+                mapper -> ((SemanticTextFieldType) mapper.fieldType()).indexOptions,
+                XContentBuilder::field,
+                Objects::toString
+            ).acceptsNull(); // .setSerializerCheck(this::indexOptionsSerializerCheck);
+
             this.inferenceFieldBuilder = c -> {
                 // Resolve the model setting from the registry if it has not been set yet.
                 var resolvedModelSettings = modelSettings.get() != null ? modelSettings.get() : getResolvedModelSettings(c, false);
@@ -262,6 +271,10 @@ public class SemanticTextFieldMapper extends FieldMapper implements InferenceFie
                 );
             };
         }
+
+        // private boolean indexOptionsSerializerCheck(boolean includeDefaults, boolean isConfigured, SemanticTextIndexOptions value) {
+        // return includeDefaults || Objects.equals(value, defaultIndexOptions(indexVersionCreated, modelSettings.get())) == false;
+        // }
 
         public Builder setInferenceId(String id) {
             this.inferenceId.setValue(id);
@@ -1233,6 +1246,19 @@ public class SemanticTextFieldMapper extends FieldMapper implements InferenceFie
             SemanticTextIndexOptions.SupportedIndexOptions.DENSE_VECTOR,
             defaultBbqHnswDenseVectorIndexOptions()
         );
+    }
+
+    static SemanticTextIndexOptions defaultIndexOptions(IndexVersion indexVersionCreated, MinimalServiceSettings modelSettings) {
+
+        if (modelSettings == null) {
+            return null;
+        }
+
+        if (modelSettings.taskType() == TaskType.TEXT_EMBEDDING && indexVersionDefaultsToBbqHnsw(indexVersionCreated)) {
+            return defaultBbqHnswSemanticTextIndexOptions();
+        }
+
+        return null;
     }
 
     private static boolean canMergeModelSettings(MinimalServiceSettings previous, MinimalServiceSettings current, Conflicts conflicts) {

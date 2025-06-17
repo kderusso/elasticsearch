@@ -53,7 +53,7 @@ import org.elasticsearch.search.rank.RankDoc;
 import org.elasticsearch.search.vectors.KnnVectorQueryBuilder;
 import org.elasticsearch.xcontent.XContentType;
 import org.elasticsearch.xpack.core.ml.search.SparseVectorQueryBuilder;
-import org.elasticsearch.xpack.inference.InferencePlugin;
+import org.elasticsearch.xpack.inference.Utils;
 import org.elasticsearch.xpack.inference.mapper.SemanticTextFieldMapper;
 import org.mockito.Mockito;
 
@@ -90,7 +90,7 @@ public class SemanticTextHighlighterTests extends MapperServiceTestCase {
 
     @Override
     protected Collection<? extends Plugin> getPlugins() {
-        return List.of(new InferencePlugin(Settings.EMPTY));
+        return List.of(new Utils.InferencePluginWithModelRegistry(Settings.EMPTY));
     }
 
     @SuppressWarnings("unchecked")

@@ -18,13 +18,16 @@ import org.elasticsearch.xpack.core.LocalStateCompositeXPackPlugin;
 import org.elasticsearch.xpack.core.ssl.SSLService;
 import org.elasticsearch.xpack.inference.mock.TestDenseInferenceServiceExtension;
 import org.elasticsearch.xpack.inference.mock.TestSparseInferenceServiceExtension;
+import org.elasticsearch.xpack.inference.registry.ModelRegistry;
 
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 import static java.util.stream.Collectors.toList;
+import static org.mockito.Mockito.mock;
 
 public class LocalStateInferencePlugin extends LocalStateCompositeXPackPlugin {
     private final InferencePlugin inferencePlugin;
@@ -32,6 +35,7 @@ public class LocalStateInferencePlugin extends LocalStateCompositeXPackPlugin {
     public LocalStateInferencePlugin(final Settings settings, final Path configPath) throws Exception {
         super(settings, configPath);
         LocalStateInferencePlugin thisVar = this;
+
         this.inferencePlugin = new InferencePlugin(settings) {
             @Override
             protected SSLService getSslService() {
@@ -50,7 +54,13 @@ public class LocalStateInferencePlugin extends LocalStateCompositeXPackPlugin {
                     TestDenseInferenceServiceExtension.TestInferenceService::new
                 );
             }
+
+            @Override
+            protected Supplier<ModelRegistry> getModelRegistry() {
+                return () -> mock(ModelRegistry.class);
+            }
         };
+
         plugins.add(inferencePlugin);
     }
 

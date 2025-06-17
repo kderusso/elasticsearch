@@ -36,7 +36,7 @@ import org.elasticsearch.plugins.MapperPlugin;
 import org.elasticsearch.xcontent.XContentBuilder;
 import org.elasticsearch.xcontent.XContentType;
 import org.elasticsearch.xcontent.json.JsonXContent;
-import org.elasticsearch.xpack.inference.InferencePlugin;
+import org.elasticsearch.xpack.inference.Utils;
 import org.elasticsearch.xpack.inference.model.TestModel;
 
 import java.io.IOException;
@@ -72,7 +72,7 @@ public class SemanticInferenceMetadataFieldsRecoveryTests extends EngineTestCase
 
     @Override
     protected List<MapperPlugin> extraMappers() {
-        return List.of(new InferencePlugin(Settings.EMPTY));
+        return List.of(new Utils.InferencePluginWithModelRegistry(Settings.EMPTY));
     }
 
     @Override
