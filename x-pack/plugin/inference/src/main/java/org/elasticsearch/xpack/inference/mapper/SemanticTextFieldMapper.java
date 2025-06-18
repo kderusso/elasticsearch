@@ -250,12 +250,12 @@ public class SemanticTextFieldMapper extends FieldMapper implements InferenceFie
             this.indexOptions = new Parameter<>(
                 INDEX_OPTIONS_FIELD,
                 true,
-                () -> defaultIndexOptions(indexVersionCreated, modelRegistry.getMinimalServiceSettings(inferenceId.get())),
+                () -> null,
                 (n, c, o) -> parseIndexOptionsFromMap(n, o, c.indexVersionCreated()),
                 mapper -> ((SemanticTextFieldType) mapper.fieldType()).indexOptions,
                 XContentBuilder::field,
                 Objects::toString
-            ).acceptsNull(); // .setSerializerCheck(this::indexOptionsSerializerCheck);
+            ).acceptsNull().setSerializerCheck(this::indexOptionsSerializerCheck);
 
             this.inferenceFieldBuilder = c -> {
                 // Resolve the model setting from the registry if it has not been set yet.
@@ -272,9 +272,9 @@ public class SemanticTextFieldMapper extends FieldMapper implements InferenceFie
             };
         }
 
-        // private boolean indexOptionsSerializerCheck(boolean includeDefaults, boolean isConfigured, SemanticTextIndexOptions value) {
-        // return includeDefaults || Objects.equals(value, defaultIndexOptions(indexVersionCreated, modelSettings.get())) == false;
-        // }
+        private boolean indexOptionsSerializerCheck(boolean includeDefaults, boolean isConfigured, SemanticTextIndexOptions value) {
+            return includeDefaults || value == null && defaultIndexOptions(indexVersionCreated, modelSettings.get()) != null;
+        }
 
         public Builder setInferenceId(String id) {
             this.inferenceId.setValue(id);
