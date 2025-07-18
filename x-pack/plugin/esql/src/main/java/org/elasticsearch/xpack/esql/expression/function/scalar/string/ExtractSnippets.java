@@ -7,11 +7,11 @@
 
 package org.elasticsearch.xpack.esql.expression.function.scalar.string;
 
-import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.common.io.stream.NamedWriteableRegistry;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
-import org.elasticsearch.compute.ann.Evaluator;
+import org.elasticsearch.compute.lucene.LuceneQueryEvaluator;
+import org.elasticsearch.compute.lucene.LuceneQueryExpressionEvaluator;
 import org.elasticsearch.compute.operator.EvalOperator.ExpressionEvaluator;
 import org.elasticsearch.xpack.esql.core.expression.Expression;
 import org.elasticsearch.xpack.esql.core.tree.NodeInfo;
@@ -23,6 +23,7 @@ import org.elasticsearch.xpack.esql.expression.function.OptionalArgument;
 import org.elasticsearch.xpack.esql.expression.function.Param;
 import org.elasticsearch.xpack.esql.expression.function.scalar.EsqlScalarFunction;
 import org.elasticsearch.xpack.esql.io.stream.PlanStreamInput;
+import org.elasticsearch.xpack.esql.planner.EsPhysicalOperationProviders;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -48,27 +49,20 @@ public class ExtractSnippets extends EsqlScalarFunction implements OptionalArgum
     );
 
     private static final int DEFAULT_NUM_SNIPPETS = 1;
-    private static final int DEFAULT_SNIPPET_LENGTH = 10; // TODO determine a good default. 512, Elastic reranker token limit?
+    private static final int DEFAULT_SNIPPET_LENGTH = 10; // TODO determine a good default. 512 * 5?
 
-    // toSearch - the field or other calculated string content to search
-    private final Expression toSearch;
-    // str - the string we are searching toSearch for relevant snippets
-    private final Expression str;
-    private final Expression numSnippets;
-
-    // I added the length here for this function because it will be used for more than just reranking, but
-    // it makes sense to be optional/have a default value for when it is called for reranking purposes
-    private final Expression snippetLength;
+    // TODO better names?
+    private final Expression field, str, numSnippets, snippetLength;
 
     @FunctionInfo(
-        returnType = "string", // TODO is this the correct return type, or should it be some sort of list?
+        returnType = "keyword",
         description = """
             Extracts the most relevant snippets to return from a given input string""",
-        examples = @Example(file = "string", tag = "extract_snippets")
+        examples = @Example(file = "keyword", tag = "extract_snippets")
     )
     public ExtractSnippets(
         Source source,
-        @Param(name = "to_search", type = { "keyword" }, description = "The input string") Expression toSearch,
+        @Param(name = "field", type = { "keyword" }, description = "The input string") Expression field,
         @Param(name = "str", type = { "keyword", "text" }, description = "The input string") Expression str,
         @Param(
             optional = true,
@@ -84,7 +78,7 @@ public class ExtractSnippets extends EsqlScalarFunction implements OptionalArgum
         ) Expression snippetLength
     ) {
         super(source, numSnippets == null ? Collections.singletonList(str) : Arrays.asList(str, numSnippets));
-        this.toSearch = toSearch;
+        this.field = field;
         this.str = str;
         this.numSnippets = numSnippets;
         this.snippetLength = snippetLength;
@@ -95,15 +89,15 @@ public class ExtractSnippets extends EsqlScalarFunction implements OptionalArgum
             Source.readFrom((PlanStreamInput) in),
             in.readNamedWriteable(Expression.class),
             in.readNamedWriteable(Expression.class),
-            in.readNamedWriteable(Expression.class),
-            in.readNamedWriteable(Expression.class)
+            in.readOptionalNamedWriteable(Expression.class),
+            in.readOptionalNamedWriteable(Expression.class)
         );
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         source().writeTo(out);
-        out.writeNamedWriteable(toSearch);
+        out.writeNamedWriteable(field);
         out.writeNamedWriteable(str);
         out.writeOptionalNamedWriteable(numSnippets);
         out.writeOptionalNamedWriteable(snippetLength);
@@ -116,7 +110,7 @@ public class ExtractSnippets extends EsqlScalarFunction implements OptionalArgum
 
     @Override
     public DataType dataType() {
-        return DataType.KEYWORD; // TODO should this be TEXT or KEYWORD?
+        return field.dataType().noText();
     }
 
     @Override
@@ -125,7 +119,7 @@ public class ExtractSnippets extends EsqlScalarFunction implements OptionalArgum
             return new TypeResolution("Unresolved children");
         }
 
-        TypeResolution resolution = isString(toSearch, sourceText(), FIRST);
+        TypeResolution resolution = isString(field, sourceText(), FIRST);
         if (resolution.unresolved()) {
             return resolution;
         }
@@ -149,43 +143,40 @@ public class ExtractSnippets extends EsqlScalarFunction implements OptionalArgum
 
     @Override
     public boolean foldable() {
-        return toSearch.foldable()
+        return field.foldable()
             && str.foldable()
             && (numSnippets == null || numSnippets.foldable())
             && (snippetLength == null || snippetLength.foldable());
     }
 
-    // TODO - It makes sense for this to return a list of strings (one string for each returned snippet)
-    // However, the are currently no Types that support List<String>
-    // We can either create a new Type for List<String> or turn this into something else - String? BytesRef?
-    @Evaluator
-    static List<String> process(BytesRef toSearch, BytesRef str, int numSnippets, int snippetLength) {
-        if (toSearch == null || toSearch.length == 0 || str == null || str.length == 0) {
-            return Collections.emptyList();
-        }
-
-        String utf8ToSearch = toSearch.utf8ToString();
-        String utf8Str = str.utf8ToString();
-        if (snippetLength > utf8ToSearch.length()) {
-            return Collections.singletonList(utf8ToSearch);
-        }
-
-        // TODO - actually calculate snippets using search string, this truncation is just a placeholder
-        List<String> snippets = new ArrayList<>(numSnippets);
-        int pos = 0;
-        for (int i = 0; i < numSnippets && pos < utf8ToSearch.length(); i++) {
-            int end = Math.min(pos + snippetLength, utf8ToSearch.length());
-            String snippet = utf8ToSearch.substring(pos, end);
-            snippets.add(snippet);
-            pos += snippetLength;
-        }
-        return snippets;
-    }
-
-    @Evaluator(extraName = "NoStart")
-    static List<String> process(BytesRef toSearch, BytesRef str) {
-        return process(toSearch, str, DEFAULT_NUM_SNIPPETS, DEFAULT_SNIPPET_LENGTH);
-    }
+    // @Evaluator
+    // static BytesRef process(BytesRef field, BytesRef str, int numSnippets, int snippetLength) {
+    // if (field == null || field.length == 0 || str == null || str.length == 0) {
+    // return null;
+    // }
+    //
+    // String utf8Field = field.utf8ToString();
+    // String utf8Str = str.utf8ToString();
+    // if (snippetLength > utf8Field.length()) {
+    // return field;
+    // }
+    //
+    // // TODO - actually calculate snippets using search string, this truncation is just a placeholder
+    // List<String> snippets = new ArrayList<>(numSnippets);
+    // int pos = 0;
+    // for (int i = 0; i < numSnippets && pos < utf8Field.length(); i++) {
+    // int end = Math.min(pos + snippetLength, utf8Field.length());
+    // String snippet = utf8Field.substring(pos, end);
+    // snippets.add(snippet);
+    // pos += snippetLength;
+    // }
+    // return snippets.get(0);
+    // }
+    //
+    // @Evaluator(extraName = "NoStart")
+    // static BytesRef process(BytesRef field, BytesRef str) {
+    // return process(field, str, DEFAULT_NUM_SNIPPETS, DEFAULT_SNIPPET_LENGTH);
+    // }
 
     @Override
     public Expression replaceChildren(List<Expression> newChildren) {
@@ -200,23 +191,20 @@ public class ExtractSnippets extends EsqlScalarFunction implements OptionalArgum
 
     @Override
     protected NodeInfo<? extends Expression> info() {
-        return NodeInfo.create(this, ExtractSnippets::new, toSearch, str, numSnippets, snippetLength);
+        return NodeInfo.create(this, ExtractSnippets::new, field, str, numSnippets, snippetLength);
     }
 
     @Override
     public ExpressionEvaluator.Factory toEvaluator(ToEvaluator toEvaluator) {
-        // TODO this has to be auto-generated?
-        return new ExtractSnippetsEvaluator.Factory(
-            source(),
-            toEvaluator.apply(toSearch),
-            toEvaluator.apply(str),
-            toEvaluator.apply(numSnippets),
-            toEvaluator.apply(snippetLength)
-        );
+        List<EsPhysicalOperationProviders.ShardContext> shardContexts = toEvaluator.shardContexts();
+        LuceneQueryEvaluator.ShardConfig[] shardConfigs = new LuceneQueryEvaluator.ShardConfig[shardContexts.size()];
+        int i = 0;
+        for (EsPhysicalOperationProviders.ShardContext shardContext : shardContexts) {
+            shardConfigs[i++] = new LuceneQueryEvaluator.ShardConfig(shardContext.toQuery(queryBuilder()), shardContext.searcher());
+        }
+        return new LuceneQueryExpressionEvaluator.Factory(shardConfigs);
     }
 
-    Expression toSearch() {
-        return toSearch;
     }
 
     Expression str() {
