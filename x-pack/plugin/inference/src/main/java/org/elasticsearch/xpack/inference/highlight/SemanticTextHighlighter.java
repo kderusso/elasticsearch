@@ -102,6 +102,8 @@ public class SemanticTextHighlighter implements Highlighter {
             ? 1 // we return the best fragment by default
             : fieldContext.field.fieldOptions().numberOfFragments();
 
+        int fragmentCharSize = fieldContext.field.fieldOptions().fragmentCharSize();
+
         List<OffsetAndScore> chunks = extractOffsetAndScores(
             fieldContext.context.getSearchExecutionContext(),
             fieldContext.hitContext.reader(),
@@ -157,6 +159,10 @@ public class SemanticTextHighlighter implements Highlighter {
                         chunk.offset
                     )
                 );
+            }
+            // Truncate content if fragmentCharSize is specified and content exceeds it
+            if (fragmentCharSize > 0 && content.length() > fragmentCharSize) {
+                content = content.substring(0, fragmentCharSize);
             }
             snippets[i] = new Text(content);
         }
