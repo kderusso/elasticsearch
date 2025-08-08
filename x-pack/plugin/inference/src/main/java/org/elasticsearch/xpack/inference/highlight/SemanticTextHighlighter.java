@@ -146,7 +146,15 @@ public class SemanticTextHighlighter implements Highlighter {
                 return content.substring(entry.offset().start(), entry.offset().end());
             };
         }
-        for (int i = 0; i < size; i++) {
+        // Track which chunks have been consumed to avoid duplication
+        boolean[] consumed = new boolean[chunks.size()];
+        int snippetIndex = 0;
+        
+        for (int i = 0; i < chunks.size() && snippetIndex < size; i++) {
+            if (consumed[i]) {
+                continue; // Skip already consumed chunks
+            }
+            
             var chunk = chunks.get(i);
             String content = offsetToContent.apply(chunk);
             if (content == null) {
@@ -154,17 +162,46 @@ public class SemanticTextHighlighter implements Highlighter {
                     String.format(
                         Locale.ROOT,
 
-                        "Invalid content detected for field [%s]: missing text for the chunk at offset [%d].",
+                        "Invalid content detected for field [%s]: missing text for the chunk at offset [%s].",
                         fieldType.name(),
                         chunk.offset
                     )
                 );
             }
-            // Truncate content if fragmentCharSize is specified and content exceeds it
+            
+            consumed[i] = true; // Mark this chunk as consumed
+            
+            // Concatenate with next chunks if fragmentCharSize is specified and current content is shorter
+            if (fragmentCharSize > 0 && content.length() < fragmentCharSize) {
+                StringBuilder concatenated = new StringBuilder(content);
+                
+                // Look ahead to find more chunks to concatenate
+                for (int nextIndex = i + 1; nextIndex < chunks.size() && concatenated.length() < fragmentCharSize; nextIndex++) {
+                    if (consumed[nextIndex]) {
+                        continue; // Skip already consumed chunks
+                    }
+                    
+                    var nextChunk = chunks.get(nextIndex);
+                    String nextContent = offsetToContent.apply(nextChunk);
+                    if (nextContent == null) {
+                        continue; // Skip null content
+                    }
+                    
+                    // Add this chunk to reach closer to fragmentCharSize
+                    concatenated.append(" ").append(nextContent); // Add space separator
+                    consumed[nextIndex] = true; // Mark as consumed
+                }
+                
+                content = concatenated.toString();
+            }
+            
+            // Truncate content if it exceeds fragmentCharSize
             if (fragmentCharSize > 0 && content.length() > fragmentCharSize) {
                 content = content.substring(0, fragmentCharSize);
             }
-            snippets[i] = new Text(content);
+            
+            snippets[snippetIndex] = new Text(content);
+            snippetIndex++;
         }
         return new HighlightField(fieldContext.fieldName, snippets);
     }
