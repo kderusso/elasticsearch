@@ -15,6 +15,7 @@ import org.elasticsearch.common.util.Maps;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
 
@@ -50,7 +51,17 @@ public final class SearchUsageHolder {
         for (String retriever : searchUsage.getRetrieverUsage()) {
             retrieversUsage.computeIfAbsent(retriever, q -> new LongAdder()).increment();
         }
-        // TODO extended data
+        for (Map.Entry<String, Map<String,Set<String>>> entry : searchUsage.getExtendedData().entrySet()) {
+            String category = entry.getKey();
+            for (Map.Entry<String, Set<String>> innerEntry : entry.getValue().entrySet()) {
+                String name = innerEntry.getKey();
+                for (String value : innerEntry.getValue()) {
+                    extendedRetrieverUsage.computeIfAbsent(category, k -> new ConcurrentHashMap<>())
+                        .computeIfAbsent(name + ":" + value, k -> new LongAdder())
+                        .increment();
+                }
+            }
+        }
     }
 
     /**
@@ -65,7 +76,14 @@ public final class SearchUsageHolder {
         rescorersUsage.forEach((query, adder) -> rescorersUsageMap.put(query, adder.longValue()));
         Map<String, Long> retrieversUsageMap = Maps.newMapWithExpectedSize(retrieversUsage.size());
         retrieversUsage.forEach((retriever, adder) -> retrieversUsageMap.put(retriever, adder.longValue()));
-        // TODO extended data
+
+        Map<String, Map<String, Long>> extendedRetrieverMap = Maps.newMapWithExpectedSize(extendedRetrieverUsage.size());
+        extendedRetrieverUsage.forEach((category, innerMap) -> {
+            Map<String, Long> categoryMap = Maps.newMapWithExpectedSize(innerMap.size());
+            innerMap.forEach((value, adder) -> categoryMap.put(value, adder.longValue()));
+            extendedRetrieverMap.put(category, categoryMap);
+        });
+        ExtendedData extendedData = new ExtendedData(extendedRetrieverMap);
 
         return new SearchUsageStats(
             Collections.unmodifiableMap(queriesUsageMap),

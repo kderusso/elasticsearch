@@ -124,9 +124,9 @@ public final class SearchUsageStats implements Writeable, ToXContentFragment {
             builder.map(sections);
             builder.field("retrievers");
             builder.map(retrievers);
-            builder.field("metadata");
+            builder.field("extended");
+            extendedData.toXContent(builder, params);
         }
-        extendedData.toXContent(builder, params);
         builder.endObject();
         return builder;
     }

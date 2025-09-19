@@ -12,7 +12,7 @@ package org.elasticsearch.action.admin.cluster.stats.extended;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.io.stream.Writeable;
-import org.elasticsearch.xcontent.ToXContentFragment;
+import org.elasticsearch.xcontent.ToXContent;
 import org.elasticsearch.xcontent.XContentBuilder;
 
 import java.io.IOException;
@@ -20,10 +20,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-public class ExtendedData implements Writeable, ToXContentFragment {
-
-    private final String NAME = "extended";
-    private final String RETRIEVERS_NAME = "retrievers";
+public class ExtendedData implements Writeable, ToXContent {
 
     private final Map<String, Map<String,Long>> retrievers;
 
@@ -56,9 +53,16 @@ public class ExtendedData implements Writeable, ToXContentFragment {
 
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
-       builder.startObject(NAME);
-       builder.field(RETRIEVERS_NAME);
-       builder.map(retrievers);
+
+        builder.startObject();
+       for (String retriever : retrievers.keySet()) {
+           builder.startObject(retriever);
+           Map<String, Long> extendedDataForRetriever = retrievers.get(retriever);
+           for (String key : extendedDataForRetriever.keySet()) {
+               builder.field(key, extendedDataForRetriever.get(key));
+           }
+           builder.endObject();
+       }
        builder.endObject();
        return builder;
     }

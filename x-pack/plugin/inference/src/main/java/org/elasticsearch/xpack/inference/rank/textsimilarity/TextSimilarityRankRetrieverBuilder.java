@@ -88,7 +88,8 @@ public class TextSimilarityRankRetrieverBuilder extends CompoundRetrieverBuilder
     static {
         PARSER.declareNamedObject(constructorArg(), (p, c, n) -> {
             RetrieverBuilder innerRetriever = p.namedObject(RetrieverBuilder.class, n, c);
-            c.trackRetrieverUsage(innerRetriever.getName(), innerRetriever.getMetadataFields());
+            c.trackRetrieverUsage(innerRetriever.getName());
+            c.trackRetrieverExtendedDataUsage(innerRetriever.retrieverName(), innerRetriever.getMetadataFields());
             return innerRetriever;
         }, RETRIEVER_FIELD);
         PARSER.declareString(optionalConstructorArg(), INFERENCE_ID_FIELD);
