@@ -10,6 +10,7 @@
 package org.elasticsearch.usage;
 
 import org.elasticsearch.action.admin.cluster.stats.SearchUsageStats;
+import org.elasticsearch.action.admin.cluster.stats.extended.ExtendedData;
 import org.elasticsearch.common.util.Maps;
 
 import java.util.Collections;
@@ -28,7 +29,7 @@ public final class SearchUsageHolder {
     private final Map<String, LongAdder> rescorersUsage = new ConcurrentHashMap<>();
     private final Map<String, LongAdder> sectionsUsage = new ConcurrentHashMap<>();
     private final Map<String, LongAdder> retrieversUsage = new ConcurrentHashMap<>();
-    private final Map<String, LongAdder> metadataUsage = new ConcurrentHashMap<>();
+    private final Map<String,Map<String,LongAdder>> extendedRetrieverUsage = new ConcurrentHashMap<>();
 
     SearchUsageHolder() {}
 
@@ -49,9 +50,7 @@ public final class SearchUsageHolder {
         for (String retriever : searchUsage.getRetrieverUsage()) {
             retrieversUsage.computeIfAbsent(retriever, q -> new LongAdder()).increment();
         }
-        for (String metadata : searchUsage.getMetadataUsage()) {
-            metadataUsage.computeIfAbsent(metadata, q -> new LongAdder()).increment();
-        }
+        // TODO extended data
     }
 
     /**
@@ -66,14 +65,14 @@ public final class SearchUsageHolder {
         rescorersUsage.forEach((query, adder) -> rescorersUsageMap.put(query, adder.longValue()));
         Map<String, Long> retrieversUsageMap = Maps.newMapWithExpectedSize(retrieversUsage.size());
         retrieversUsage.forEach((retriever, adder) -> retrieversUsageMap.put(retriever, adder.longValue()));
-        Map<String, Long> metadataUsageMap = Maps.newMapWithExpectedSize(metadataUsage.size());
-        metadataUsage.forEach((metadata, adder) -> metadataUsageMap.put(metadata, adder.longValue()));
+        // TODO extended data
+
         return new SearchUsageStats(
             Collections.unmodifiableMap(queriesUsageMap),
             Collections.unmodifiableMap(rescorersUsageMap),
             Collections.unmodifiableMap(sectionsUsageMap),
             Collections.unmodifiableMap(retrieversUsageMap),
-            Collections.unmodifiableMap(metadataUsageMap),
+            extendedData,
             totalSearchCount.longValue()
         );
     }

@@ -9,6 +9,7 @@
 
 package org.elasticsearch.action.admin.cluster.stats;
 
+import org.elasticsearch.action.admin.cluster.stats.extended.ExtendedData;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
@@ -22,7 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-import static org.elasticsearch.TransportVersions.RETRIEVERS_TELEMETRY_EXTENDED;
+import static org.elasticsearch.TransportVersions.SUPPORT_EXTENDED_SEARCH_TELEMETRY;
 import static org.elasticsearch.TransportVersions.V_8_12_0;
 import static org.elasticsearch.TransportVersions.V_8_16_0;
 
@@ -37,7 +38,7 @@ public final class SearchUsageStats implements Writeable, ToXContentFragment {
     private final Map<String, Long> rescorers;
     private final Map<String, Long> sections;
     private final Map<String, Long> retrievers;
-    private final Map<String, Long> metadata;
+    private final ExtendedData extendedData;
 
     /**
      * Creates a new empty stats instance, that will get additional stats added through {@link #add(SearchUsageStats)}
@@ -48,7 +49,7 @@ public final class SearchUsageStats implements Writeable, ToXContentFragment {
         this.sections = new HashMap<>();
         this.rescorers = new HashMap<>();
         this.retrievers = new HashMap<>();
-        this.metadata = new HashMap<>();
+        this.extendedData = new ExtendedData();
     }
 
     /**
@@ -60,7 +61,7 @@ public final class SearchUsageStats implements Writeable, ToXContentFragment {
         Map<String, Long> rescorers,
         Map<String, Long> sections,
         Map<String, Long> retrievers,
-        Map<String, Long> metadata,
+        ExtendedData extendedData,
         long totalSearchCount
     ) {
         this.totalSearchCount = totalSearchCount;
@@ -68,7 +69,7 @@ public final class SearchUsageStats implements Writeable, ToXContentFragment {
         this.sections = sections;
         this.rescorers = rescorers;
         this.retrievers = retrievers;
-        this.metadata = metadata;
+        this.extendedData = extendedData;
     }
 
     public SearchUsageStats(StreamInput in) throws IOException {
@@ -77,7 +78,8 @@ public final class SearchUsageStats implements Writeable, ToXContentFragment {
         this.totalSearchCount = in.readVLong();
         this.rescorers = in.getTransportVersion().onOrAfter(V_8_12_0) ? in.readMap(StreamInput::readLong) : Map.of();
         this.retrievers = in.getTransportVersion().onOrAfter(V_8_16_0) ? in.readMap(StreamInput::readLong) : Map.of();
-        this.metadata = in.getTransportVersion().onOrAfter(RETRIEVERS_TELEMETRY_EXTENDED) ? in.readMap(StreamInput::readLong) : Map.of();
+        this.extendedData =
+            in.getTransportVersion().onOrAfter(SUPPORT_EXTENDED_SEARCH_TELEMETRY) ? new ExtendedData(in) : new ExtendedData();
     }
 
     @Override
@@ -92,8 +94,8 @@ public final class SearchUsageStats implements Writeable, ToXContentFragment {
         if (out.getTransportVersion().onOrAfter(V_8_16_0)) {
             out.writeMap(retrievers, StreamOutput::writeLong);
         }
-        if (out.getTransportVersion().onOrAfter(RETRIEVERS_TELEMETRY_EXTENDED)) {
-            out.writeMap(metadata, StreamOutput::writeLong);
+        if (out.getTransportVersion().onOrAfter(SUPPORT_EXTENDED_SEARCH_TELEMETRY)) {
+            extendedData.writeTo(out);
         }
     }
 
@@ -105,7 +107,7 @@ public final class SearchUsageStats implements Writeable, ToXContentFragment {
         stats.rescorers.forEach((rescorer, count) -> rescorers.merge(rescorer, count, Long::sum));
         stats.sections.forEach((query, count) -> sections.merge(query, count, Long::sum));
         stats.retrievers.forEach((query, count) -> retrievers.merge(query, count, Long::sum));
-        stats.metadata.forEach((meta, count) -> metadata.merge(meta, count, Long::sum));
+        this.extendedData.merge(stats.extendedData);
         this.totalSearchCount += stats.totalSearchCount;
     }
 
@@ -123,8 +125,8 @@ public final class SearchUsageStats implements Writeable, ToXContentFragment {
             builder.field("retrievers");
             builder.map(retrievers);
             builder.field("metadata");
-            builder.map(metadata);
         }
+        extendedData.toXContent(builder, params);
         builder.endObject();
         return builder;
     }
@@ -145,8 +147,8 @@ public final class SearchUsageStats implements Writeable, ToXContentFragment {
         return Collections.unmodifiableMap(retrievers);
     }
 
-    public Map<String, Long> getMetadataUsage() {
-        return Collections.unmodifiableMap(metadata);
+    public ExtendedData getExtendedData() {
+        return extendedData;
     }
 
     public long getTotalSearchCount() {
@@ -167,12 +169,12 @@ public final class SearchUsageStats implements Writeable, ToXContentFragment {
             && rescorers.equals(that.rescorers)
             && sections.equals(that.sections)
             && retrievers.equals(that.retrievers)
-            && metadata.equals(that.metadata);
+            && extendedData.equals(that.extendedData);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(totalSearchCount, queries, rescorers, sections, retrievers, metadata);
+        return Objects.hash(totalSearchCount, queries, rescorers, sections, retrievers, extendedData);
     }
 
     @Override
