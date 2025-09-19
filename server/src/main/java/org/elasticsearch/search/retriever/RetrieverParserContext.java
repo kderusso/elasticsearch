@@ -38,12 +38,12 @@ public class RetrieverParserContext {
         searchUsage.trackRescorerUsage(name);
     }
 
-    public void trackRetrieverUsage(String name, Set<String> metadata) {
-        searchUsage.trackRetrieverUsage(name, metadata);
+    public void trackRetrieverUsage(String name) {
+        searchUsage.trackRetrieverUsage(name);
     }
 
-    public void trackRetrieverUsage(String name) {
-        searchUsage.trackRetrieverUsage(name, Set.of());
+    public void trackRetrieverExtendedDataUsage(String retrieverName, Set<String> extendedData) {
+        searchUsage.trackRetrieverExtendedDataUsage(retrieverName, extendedData);
     }
 
     public void trackRetrieverExtendedDataUsage(String retrieverName, Set<String> extendedData) {
