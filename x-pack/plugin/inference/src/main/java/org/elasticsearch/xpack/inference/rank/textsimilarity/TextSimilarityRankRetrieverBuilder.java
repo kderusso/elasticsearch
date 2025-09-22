@@ -234,8 +234,8 @@ public class TextSimilarityRankRetrieverBuilder extends CompoundRetrieverBuilder
     public Set<String> getMetadataFields() {
         Set<String> metadataFields = new HashSet<>();
 
-        if (snippets != null) {
-            metadataFields.add(SNIPPETS_FIELD.getPreferredName());
+        if (chunkScorerConfig != null) {
+            metadataFields.add(CHUNK_RESCORER_FIELD.getPreferredName());
         }
 
         return metadataFields;

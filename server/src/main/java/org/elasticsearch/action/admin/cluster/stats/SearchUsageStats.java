@@ -9,6 +9,7 @@
 
 package org.elasticsearch.action.admin.cluster.stats;
 
+import org.elasticsearch.TransportVersion;
 import org.elasticsearch.action.admin.cluster.stats.extended.ExtendedData;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.io.stream.StreamInput;
@@ -23,7 +24,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-import static org.elasticsearch.TransportVersions.SUPPORT_EXTENDED_SEARCH_TELEMETRY;
 import static org.elasticsearch.TransportVersions.V_8_12_0;
 import static org.elasticsearch.TransportVersions.V_8_16_0;
 
@@ -33,6 +33,9 @@ import static org.elasticsearch.TransportVersions.V_8_16_0;
  * accumulate stats for the entire cluster and return them as part of the {@link ClusterStatsResponse}.
  */
 public final class SearchUsageStats implements Writeable, ToXContentFragment {
+
+    private static final TransportVersion EXTENDED_SEARCH_USAGE_TELEMETRY = TransportVersion.fromName("extended_search_usage_telemetry");
+
     private long totalSearchCount;
     private final Map<String, Long> queries;
     private final Map<String, Long> rescorers;
@@ -79,7 +82,7 @@ public final class SearchUsageStats implements Writeable, ToXContentFragment {
         this.rescorers = in.getTransportVersion().onOrAfter(V_8_12_0) ? in.readMap(StreamInput::readLong) : Map.of();
         this.retrievers = in.getTransportVersion().onOrAfter(V_8_16_0) ? in.readMap(StreamInput::readLong) : Map.of();
         this.extendedData =
-            in.getTransportVersion().onOrAfter(SUPPORT_EXTENDED_SEARCH_TELEMETRY) ? new ExtendedData(in) : new ExtendedData();
+            in.getTransportVersion().supports(EXTENDED_SEARCH_USAGE_TELEMETRY) ? new ExtendedData(in) : new ExtendedData();
     }
 
     @Override
@@ -94,7 +97,7 @@ public final class SearchUsageStats implements Writeable, ToXContentFragment {
         if (out.getTransportVersion().onOrAfter(V_8_16_0)) {
             out.writeMap(retrievers, StreamOutput::writeLong);
         }
-        if (out.getTransportVersion().onOrAfter(SUPPORT_EXTENDED_SEARCH_TELEMETRY)) {
+        if (out.getTransportVersion().supports(EXTENDED_SEARCH_USAGE_TELEMETRY)) {
             extendedData.writeTo(out);
         }
     }
