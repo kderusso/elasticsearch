@@ -22,30 +22,47 @@ import java.util.Objects;
 
 public class ExtendedData implements Writeable, ToXContent {
 
-    private final Map<String, Map<String,Long>> retrievers;
+    private final Map<String, Map<String,Map<String,Long>>> extendedData;
 
     public ExtendedData() {
-        this.retrievers = new HashMap<>();
+        this.extendedData = new HashMap<>();
     }
 
-    public ExtendedData(Map<String, Map<String,Long>> retrievers) {
-        this.retrievers = retrievers;
+    public ExtendedData(Map<String, Map<String,Map<String,Long>>> extendedData) {
+        this.extendedData = extendedData;
     }
 
     public ExtendedData(StreamInput in) throws IOException {
-        this.retrievers = in.readMap(StreamInput::readString, i -> i.readMap(StreamInput::readString, StreamInput::readLong));
+        this.extendedData = in.readMap(StreamInput::readString, i -> i.readMap(StreamInput::readString,
+            j -> j.readMap(StreamInput::readString, StreamInput::readLong)));
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
-        out.writeMap(retrievers, StreamOutput::writeString, (o, v) -> o.writeMap(v, StreamOutput::writeString, StreamOutput::writeLong));
+        out.writeMap(extendedData, StreamOutput::writeString, (o, v)
+            -> o.writeMap(v, StreamOutput::writeString, (p, q) -> p.writeMap(q, StreamOutput::writeString, StreamOutput::writeLong)));
     }
 
     public void merge(ExtendedData other) {
-        other.retrievers.forEach((key, otherMap) -> {
-            retrievers.merge(key, otherMap, (existingMap, newMap) -> {
-                Map<String, Long> mergedMap = new HashMap<>(existingMap);
-                newMap.forEach((innerKey, innerValue) -> mergedMap.merge(innerKey, innerValue, Long::sum));
+//        other.extendedData.forEach((key, otherMap) -> {
+//            extendedData.merge(key, otherMap, (existingMap, newMap) -> {
+//                Map<String, Map<String,Long>> mergedMap = new HashMap<>(existingMap);
+//                newMap.extendedData((innerKey, innerValue) -> mergedMap.merge(innerKey, innerValue, Long::sum));
+//                return mergedMap;
+//            });
+//        });
+        other.extendedData.forEach((key, otherMap) -> {
+            extendedData.merge(key, otherMap, (existingMap, newMap) -> {
+                Map<String, Map<String,Long>> mergedMap = new HashMap<>(existingMap);
+                newMap.forEach((innerKey, innerValue) -> {
+                    mergedMap.merge(innerKey, innerValue, (existingInnerMap, newInnerMap) -> {
+                        Map<String, Long> mergedInnerMap = new HashMap<>(existingInnerMap);
+                        newInnerMap.forEach((propertyKey, propertyValue) -> {
+                            mergedInnerMap.merge(propertyKey, propertyValue, Long::sum);
+                        });
+                        return mergedInnerMap;
+                    });
+                });
                 return mergedMap;
             });
         });
@@ -55,11 +72,13 @@ public class ExtendedData implements Writeable, ToXContent {
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
 
         builder.startObject();
-       for (String retriever : retrievers.keySet()) {
-           builder.startObject(retriever);
-           Map<String, Long> extendedDataForRetriever = retrievers.get(retriever);
-           for (String key : extendedDataForRetriever.keySet()) {
-               builder.field(key, extendedDataForRetriever.get(key));
+       for (String category : extendedData.keySet()) {
+           builder.startObject(category);
+           Map<String, Map<String,Long>> names = extendedData.get(category);
+           for (String name : names.keySet()) {
+               for (String property : names.get(name).keySet()) {
+                   builder.field(property, names.get(name).get(property));
+               }
            }
            builder.endObject();
        }
@@ -72,11 +91,11 @@ public class ExtendedData implements Writeable, ToXContent {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ExtendedData that = (ExtendedData) o;
-        return Objects.equals(retrievers, that.retrievers);
+        return Objects.equals(extendedData, that.extendedData);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(retrievers);
+        return Objects.hash(extendedData);
     }
 }

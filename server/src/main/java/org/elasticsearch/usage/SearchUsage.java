@@ -102,7 +102,7 @@ public final class SearchUsage {
     /**
      * Returns the extended data that has been tracked for the search request
      */
-    public Map<String, Map<String,Set<String>>> getExtendedData() {
+    public Map<String, Map<String,Set<String>>> getExtendedDataUsage() {
         return Collections.unmodifiableMap(extendedData);
     }
 }
