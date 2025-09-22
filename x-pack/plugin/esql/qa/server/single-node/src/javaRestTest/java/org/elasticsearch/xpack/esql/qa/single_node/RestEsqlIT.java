@@ -466,10 +466,10 @@ public class RestEsqlIT extends RestEsqlTestCase {
 
     @AwaitsFix(bugUrl = "disabled until JOIN infrastructrure properly lands")
     public void testInlineStatsProfile() throws IOException {
-        assumeTrue("INLINESTATS only available on snapshots", Build.current().isSnapshot());
+        assumeTrue("INLINE STATS only available on snapshots", Build.current().isSnapshot());
         indexTimestampData(1);
 
-        RequestObjectBuilder builder = requestObjectBuilder().query(fromIndex() + " | INLINESTATS AVG(value) | SORT value ASC");
+        RequestObjectBuilder builder = requestObjectBuilder().query(fromIndex() + " | INLINE STATS AVG(value) | SORT value ASC");
         builder.profile(true);
         if (Build.current().isSnapshot()) {
             // Lock to shard level partitioning, so we get consistent profile output
@@ -912,7 +912,7 @@ public class RestEsqlIT extends RestEsqlTestCase {
                 .entry("pages_emitted", greaterThan(0))
                 .entry("rows_emitted", greaterThan(0))
                 .entry("process_nanos", greaterThan(0))
-                .entry("processed_queries", List.of("ConstantScore(*:*)"))
+                .entry("processed_queries", List.of("*:*"))
                 .entry("partitioning_strategies", matchesMap().entry("rest-esql-test:0", "SHARD"));
             case "ValuesSourceReaderOperator" -> basicProfile().entry("pages_received", greaterThan(0))
                 .entry("pages_emitted", greaterThan(0))
@@ -950,7 +950,7 @@ public class RestEsqlIT extends RestEsqlTestCase {
                 .entry("slice_max", 0)
                 .entry("slice_min", 0)
                 .entry("process_nanos", greaterThan(0))
-                .entry("processed_queries", List.of("ConstantScore(*:*)"))
+                .entry("processed_queries", List.of("*:*"))
                 .entry("slice_index", 0);
             default -> throw new AssertionError("unexpected status: " + o);
         };

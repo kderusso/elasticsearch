@@ -946,6 +946,7 @@ public final class SearchSourceBuilder implements Writeable, ToXContentObject, R
         this.fetchSourceContext = FetchSourceContext.of(
             fetchSourceContext.fetchSource(),
             excludeVectors,
+            fetchSourceContext.excludeInferenceFields(),
             fetchSourceContext.includes(),
             fetchSourceContext.excludes()
         );
