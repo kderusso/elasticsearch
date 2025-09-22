@@ -79,6 +79,16 @@ public final class SearchUsageHolder {
         retrieversUsage.forEach((retriever, adder) -> retrieversUsageMap.put(retriever, adder.longValue()));
 
         Map<String, Map<String,Map<String, Long>>> extendedDataMap = Maps.newMapWithExpectedSize(extendedDataUsage.size());
+//        extendedDataUsage.forEach((category, innerMap) -> {
+//            Map<String, Map<String,Long>> nameMap = Maps.newMapWithExpectedSize(innerMap.size());
+//            Map<String, Long> categoryMap = Maps.newMapWithExpectedSize(nameMap.size());
+//            nameMap.forEach((name, valueMap) -> {
+//                Map<String, Long> valueCountMap = Maps.newMapWithExpectedSize(valueMap.size());
+//                valueMap.forEach((value, adder) -> valueCountMap.put(value, adder.longValue()));
+//                categoryMap.put(name, (long) valueCountMap.size());
+//            });
+//            extendedDataMap.put(category, categoryMap);
+//        });
         extendedDataUsage.forEach((category, innerMap) -> {
             Map<String, Map<String,Long>> nameMap = Maps.newMapWithExpectedSize(innerMap.size());
             innerMap.forEach((name, valueMap) -> {
