@@ -14,6 +14,7 @@ import org.elasticsearch.action.admin.cluster.stats.extended.ExtendedData;
 import org.elasticsearch.common.util.Maps;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,7 +31,7 @@ public final class SearchUsageHolder {
     private final Map<String, LongAdder> rescorersUsage = new ConcurrentHashMap<>();
     private final Map<String, LongAdder> sectionsUsage = new ConcurrentHashMap<>();
     private final Map<String, LongAdder> retrieversUsage = new ConcurrentHashMap<>();
-    private final Map<String,Map<String,LongAdder>> extendedRetrieverUsage = new ConcurrentHashMap<>();
+    private final Map<String,Map<String,Map<String,LongAdder>>> extendedDataUsage = new ConcurrentHashMap<>();
 
     SearchUsageHolder() {}
 
@@ -56,8 +57,9 @@ public final class SearchUsageHolder {
             for (Map.Entry<String, Set<String>> innerEntry : entry.getValue().entrySet()) {
                 String name = innerEntry.getKey();
                 for (String value : innerEntry.getValue()) {
-                    extendedRetrieverUsage.computeIfAbsent(category, k -> new ConcurrentHashMap<>())
-                        .computeIfAbsent(name + ":" + value, k -> new LongAdder())
+                    extendedDataUsage.computeIfAbsent(category, k -> new ConcurrentHashMap<>())
+                        .computeIfAbsent(name, k -> new ConcurrentHashMap<>())
+                        .computeIfAbsent(value, k -> new LongAdder())
                         .increment();
                 }
             }
@@ -77,13 +79,19 @@ public final class SearchUsageHolder {
         Map<String, Long> retrieversUsageMap = Maps.newMapWithExpectedSize(retrieversUsage.size());
         retrieversUsage.forEach((retriever, adder) -> retrieversUsageMap.put(retriever, adder.longValue()));
 
-        Map<String, Map<String, Long>> extendedRetrieverMap = Maps.newMapWithExpectedSize(extendedRetrieverUsage.size());
-        extendedRetrieverUsage.forEach((category, innerMap) -> {
-            Map<String, Long> categoryMap = Maps.newMapWithExpectedSize(innerMap.size());
-            innerMap.forEach((value, adder) -> categoryMap.put(value, adder.longValue()));
-            extendedRetrieverMap.put(category, categoryMap);
+        // TODO - this isn't working as expected, we need to populate the map and update extended data accordingly. This is a Monday problem.
+        Map<String, Map<String,Map<String, Long>>> extendedDataMap = Maps.newMapWithExpectedSize(extendedDataUsage.size());
+        extendedDataUsage.forEach((category, innerMap) -> {
+            Map<String, Map<String,Long>> nameMap = Maps.newMapWithExpectedSize(innerMap.size());
+            Map<String, Long> categoryMap = Maps.newMapWithExpectedSize(nameMap.size());
+            nameMap.forEach((name, valueMap) -> {
+                Map<String, Long> valueCountMap = Maps.newMapWithExpectedSize(valueMap.size());
+                valueMap.forEach((value, adder) -> valueCountMap.put(value, adder.longValue()));
+                categoryMap.put(name, (long) valueCountMap.size());
+            });
+            extendedDataMap.put(category, categoryMap);
         });
-        ExtendedData extendedData = new ExtendedData(extendedRetrieverMap);
+        ExtendedData extendedData = new ExtendedData(extendedDataMap);
 
         return new SearchUsageStats(
             Collections.unmodifiableMap(queriesUsageMap),
