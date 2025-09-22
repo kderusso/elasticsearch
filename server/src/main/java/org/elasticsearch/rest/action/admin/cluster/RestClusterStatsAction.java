@@ -35,7 +35,7 @@ public class RestClusterStatsAction extends BaseRestHandler {
         "ccs-stats",
         "retrievers-usage-stats",
         "esql-stats",
-        "metadata_stats"
+        "extended-search-usage-stats"
     );
     private static final Set<String> SUPPORTED_QUERY_PARAMETERS = Set.of("include_remotes", "nodeId", REST_TIMEOUT_PARAM);
 

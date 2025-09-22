@@ -134,7 +134,7 @@ public abstract class RetrieverBuilder implements Rewriteable<RetrieverBuilder>,
         }
 
         context.trackRetrieverUsage(retrieverName);
-        context.trackRetrieverExtendedDataUsage(retrieverName, retrieverBuilder.getMetadataFields());
+        context.trackRetrieverExtendedDataUsage(retrieverName, retrieverBuilder.getExtendedFields());
 
         if (parser.currentToken() != XContentParser.Token.END_OBJECT) {
             throw new ParsingException(
@@ -245,7 +245,7 @@ public abstract class RetrieverBuilder implements Rewriteable<RetrieverBuilder>,
         return validationException;
     }
 
-    public Set<String> getMetadataFields() {
+    public Set<String> getExtendedFields() {
         return Set.of();
     }
 
