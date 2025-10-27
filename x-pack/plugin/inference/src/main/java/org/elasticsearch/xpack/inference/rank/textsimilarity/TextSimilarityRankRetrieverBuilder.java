@@ -10,6 +10,7 @@ package org.elasticsearch.xpack.inference.rank.textsimilarity;
 import org.apache.lucene.search.ScoreDoc;
 import org.elasticsearch.features.NodeFeature;
 import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.index.query.QueryRewriteContext;
 import org.elasticsearch.inference.ChunkingSettings;
 import org.elasticsearch.license.LicenseUtils;
 import org.elasticsearch.license.XPackLicenseState;
