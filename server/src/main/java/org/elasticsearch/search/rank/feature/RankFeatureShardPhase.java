@@ -79,11 +79,12 @@ public final class RankFeatureShardPhase {
             if (fetchSearchResult == null || fetchSearchResult.hits() == null) {
                 return;
             }
+
             // this cannot be null; as we have either already checked for it, or we would have thrown in
             // FetchSearchResult#shardResult()
             SearchHits hits = fetchSearchResult.hits();
             RankFeatureShardResult featureRankShardResult = (RankFeatureShardResult) rankFeaturePhaseRankShardContext
-                .buildRankFeatureShardResult(hits, searchContext.request().shardRequestIndex());
+                .buildRankFeatureShardResult(hits, searchContext.request().shardRequestIndex(), searchContext);
             // save the result in the search context
             // need to add profiling info as well available from fetch
             if (featureRankShardResult != null) {

@@ -97,7 +97,7 @@ import java.util.function.ToLongFunction;
 
 import static org.elasticsearch.search.SearchService.DEFAULT_SIZE;
 
-final class DefaultSearchContext extends SearchContext {
+public final class DefaultSearchContext extends SearchContext {
 
     private final ReaderContext readerContext;
     private final ShardSearchRequest request;
@@ -642,6 +642,10 @@ final class DefaultSearchContext extends SearchContext {
     @Override
     public ContextIndexSearcher searcher() {
         return this.searcher;
+    }
+
+    public IndexService indexService() {
+        return this.indexService;
     }
 
     @Override
