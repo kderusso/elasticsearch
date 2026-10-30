@@ -11,3 +11,12 @@
           nodes.info: {}
 
     - contains:  { nodes.$master.modules: { name: x-pack-context-engine } }
+
+---
+"Context Engine feature registered":
+    - skip:
+          features: contains
+    - do:
+          features.get_features: {}
+
+    - contains:  { features: { name: context_engine } }

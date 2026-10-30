@@ -43,7 +43,7 @@ public class ContextEnginePlugin extends Plugin implements SystemIndexPlugin {
 
     @Override
     public Collection<SystemIndexDescriptor> getSystemIndexDescriptors(Settings settings) {
-        return List.of();
+        return List.of(ContextEngineIndexService.getSystemIndexDescriptor());
     }
 
     @Override
