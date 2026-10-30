@@ -18,7 +18,10 @@ import org.junit.ClassRule;
 public class ContextEngineRestIT extends ESClientYamlSuiteTestCase {
 
     @ClassRule
-    public static ElasticsearchCluster cluster = ElasticsearchCluster.local().module("x-pack-context-engine").build();
+    public static ElasticsearchCluster cluster = ElasticsearchCluster.local()
+        .module("x-pack-context-engine")
+        .module("data-streams")
+        .build();
 
     public ContextEngineRestIT(@Name("yaml") final ClientYamlTestCandidate testCandidate) {
         super(testCandidate);

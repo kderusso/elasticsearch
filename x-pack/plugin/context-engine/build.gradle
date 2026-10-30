@@ -25,6 +25,8 @@ dependencies {
   compileOnly project(path: xpackModule('core'))
   testImplementation(testArtifact(project(xpackModule('core'))))
   testImplementation project(":test:framework")
+
+  clusterModules project(':modules:data-streams')
 }
 
 restResources {
