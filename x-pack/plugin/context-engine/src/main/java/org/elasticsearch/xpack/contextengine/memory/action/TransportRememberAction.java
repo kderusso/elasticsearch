@@ -28,7 +28,9 @@ public class TransportRememberAction extends HandledTransportAction<RememberActi
     public TransportRememberAction(Settings settings, TransportService transportService, ActionFilters actionFilters, Client client) {
         super(RememberAction.NAME, transportService, actionFilters, RememberAction.Request::new, EsExecutors.DIRECT_EXECUTOR_SERVICE);
         this.sessionMemoryIndexService = new SessionMemoryIndexService(client);
-        this.redactionInferenceId = ContextEnginePlugin.SESSION_MEMORY_REDACTION_INFERENCE_ID.get(settings);
+        this.redactionInferenceId = ContextEnginePlugin.SESSION_MEMORY_REDACTION_ENABLED.get(settings)
+            ? ContextEnginePlugin.SESSION_MEMORY_REDACTION_INFERENCE_ID.get(settings)
+            : null;
     }
 
     @Override

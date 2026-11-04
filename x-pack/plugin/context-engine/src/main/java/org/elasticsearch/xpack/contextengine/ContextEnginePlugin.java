@@ -100,8 +100,18 @@ public class ContextEnginePlugin extends Plugin implements SystemIndexPlugin {
     );
 
     /**
+     * Whether a memory's {@code content} has its PII replaced by placeholders before the memory is stored. When disabled the
+     * content is stored as sent.
+     */
+    public static final Setting<Boolean> SESSION_MEMORY_REDACTION_ENABLED = Setting.boolSetting(
+        "xpack.context_engine.session_memory.redaction.enabled",
+        true,
+        Setting.Property.NodeScope
+    );
+
+    /**
      * The {@code chat_completion} endpoint that rewrites a memory's {@code content} with its PII replaced by placeholders before
-     * the memory is stored. The default is the preconfigured EIS endpoint; an empty value stores content as sent.
+     * the memory is stored. The default is the preconfigured EIS endpoint.
      */
     public static final Setting<String> SESSION_MEMORY_REDACTION_INFERENCE_ID = Setting.simpleString(
         "xpack.context_engine.session_memory.redaction_inference_id",
@@ -121,6 +131,7 @@ public class ContextEnginePlugin extends Plugin implements SystemIndexPlugin {
     public List<Setting<?>> getSettings() {
         return List.of(
             SESSION_MEMORY_INFERENCE_ID,
+            SESSION_MEMORY_REDACTION_ENABLED,
             SESSION_MEMORY_REDACTION_INFERENCE_ID,
             AiIndexTemplateRegistry.AI_INDEX_REGISTRY_ENABLED
         );

@@ -75,6 +75,11 @@ public class ContextEnginePluginTests extends ESTestCase {
         );
     }
 
+    public void testSessionMemoryRedactionEnabled() {
+        assertThat(ContextEnginePlugin.SESSION_MEMORY_REDACTION_ENABLED.get(Settings.EMPTY), equalTo(true));
+        assertThat(new ContextEnginePlugin(Settings.EMPTY).getSettings(), hasItem(ContextEnginePlugin.SESSION_MEMORY_REDACTION_ENABLED));
+    }
+
     public void testFeatureRegistersWithoutOverlap() {
         ContextEnginePlugin plugin = new ContextEnginePlugin(Settings.EMPTY);
         SystemIndices systemIndices = new SystemIndices(List.of(SystemIndices.Feature.fromSystemIndexPlugin(plugin, Settings.EMPTY)));

@@ -29,7 +29,7 @@ The plugin sends the content to a `chat_completion` endpoint with a redaction pr
 
 The POC uses the inference call in `remember()`, which requires EIS.
 
-- `xpack.context_engine.session_memory.redaction_inference_id` defaults to `.rainbow-sprinkles-elastic` ([ContextEnginePlugin](src/main/java/org/elasticsearch/xpack/contextengine/ContextEnginePlugin.java)). Setting it to another `chat_completion` endpoint overrides the default, and setting it to an empty string disables redaction.
+- `xpack.context_engine.session_memory.redaction.enabled` defaults to `true`, and `xpack.context_engine.session_memory.redaction_inference_id` defaults to `.rainbow-sprinkles-elastic` ([ContextEnginePlugin](src/main/java/org/elasticsearch/xpack/contextengine/ContextEnginePlugin.java)). Setting the id to another `chat_completion` endpoint overrides the default; an empty id is not possible, because Elasticsearch drops empty setting values, so redaction is turned off with the `enabled` flag.
 - When a memory has `content`, [SessionMemoryIndexService.remember](src/main/java/org/elasticsearch/xpack/contextengine/memory/SessionMemoryIndexService.java#L75) sends the prompt and the content through `UnifiedCompletionAction` as a non-streaming request, replaces `content` with the reply, and then indexes the memory. The stored `content`, the `inputs` embedding, and the remember response all contain the redacted text.
 - The prompt is a constant in `SessionMemoryIndexService`. It instructs the model to replace names, email addresses, phone numbers, postal addresses, and government or account identifiers with placeholders such as `<NAME>` and `<EMAIL>`, and to return the rest of the text unchanged.
 
@@ -70,8 +70,9 @@ The response and the stored document contain the redacted text, such as `Call me
 GET _context_engine/session_memory?session_id=s-1
 ```
 
-To use a different endpoint, or to disable redaction with an empty value:
+To use a different endpoint, or to disable redaction:
 
 ```
 ./gradlew run -Dtests.es.xpack.context_engine.session_memory.redaction_inference_id=my-llm
+./gradlew run -Dtests.es.xpack.context_engine.session_memory.redaction.enabled=false
 ```
