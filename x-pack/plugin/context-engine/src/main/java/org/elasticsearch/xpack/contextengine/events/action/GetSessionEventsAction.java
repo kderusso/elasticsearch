@@ -38,23 +38,27 @@ public class GetSessionEventsAction {
 
         private final String sessionId;
         @Nullable
+        private final String userId;
+        @Nullable
         private final String space;
         @Nullable
-        private final String aiIndexId;
+        private final List<String> aiIndexIds;
         private final int size;
 
-        public Request(String sessionId, @Nullable String space, @Nullable String aiIndexId, int size) {
+        public Request(String sessionId, @Nullable String userId, @Nullable String space, @Nullable List<String> aiIndexIds, int size) {
             this.sessionId = sessionId;
+            this.userId = userId;
             this.space = space;
-            this.aiIndexId = aiIndexId;
+            this.aiIndexIds = aiIndexIds;
             this.size = size;
         }
 
         public Request(StreamInput in) throws IOException {
             super(in);
             this.sessionId = in.readString();
+            this.userId = in.readOptionalString();
             this.space = in.readOptionalString();
-            this.aiIndexId = in.readOptionalString();
+            this.aiIndexIds = in.readOptionalStringCollectionAsList();
             this.size = in.readVInt();
         }
 
@@ -63,13 +67,18 @@ public class GetSessionEventsAction {
         }
 
         @Nullable
+        public String userId() {
+            return userId;
+        }
+
+        @Nullable
         public String space() {
             return space;
         }
 
         @Nullable
-        public String aiIndexId() {
-            return aiIndexId;
+        public List<String> aiIndexIds() {
+            return aiIndexIds;
         }
 
         public int size() {
@@ -80,8 +89,9 @@ public class GetSessionEventsAction {
         public void writeTo(StreamOutput out) throws IOException {
             super.writeTo(out);
             out.writeString(sessionId);
+            out.writeOptionalString(userId);
             out.writeOptionalString(space);
-            out.writeOptionalString(aiIndexId);
+            out.writeOptionalStringCollection(aiIndexIds);
             out.writeVInt(size);
         }
 
@@ -104,13 +114,14 @@ public class GetSessionEventsAction {
             Request request = (Request) o;
             return size == request.size
                 && Objects.equals(sessionId, request.sessionId)
+                && Objects.equals(userId, request.userId)
                 && Objects.equals(space, request.space)
-                && Objects.equals(aiIndexId, request.aiIndexId);
+                && Objects.equals(aiIndexIds, request.aiIndexIds);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(sessionId, space, aiIndexId, size);
+            return Objects.hash(sessionId, userId, space, aiIndexIds, size);
         }
     }
 

@@ -39,8 +39,9 @@ public class TransportGetSessionEventsAction extends HandledTransportAction<
     protected void doExecute(Task task, GetSessionEventsAction.Request request, ActionListener<GetSessionEventsAction.Response> listener) {
         sessionEventsIndexService.getBySession(
             request.sessionId(),
+            request.userId(),
             request.space(),
-            request.aiIndexId(),
+            request.aiIndexIds(),
             request.size(),
             listener.map(GetSessionEventsAction.Response::new)
         );
