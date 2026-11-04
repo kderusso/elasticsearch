@@ -96,6 +96,16 @@ public class ContextEnginePlugin extends Plugin implements SystemIndexPlugin {
         Setting.Property.NodeScope
     );
 
+    /**
+     * The {@code chat_completion} endpoint that rewrites a memory's {@code content} with its PII replaced by placeholders before
+     * the memory is stored. The default is the preconfigured EIS endpoint; an empty value stores content as sent.
+     */
+    public static final Setting<String> SESSION_MEMORY_REDACTION_INFERENCE_ID = Setting.simpleString(
+        "xpack.context_engine.session_memory.redaction_inference_id",
+        ".rainbow-sprinkles-elastic",
+        Setting.Property.NodeScope
+    );
+
     private final Settings settings;
     private final String sessionMemoryInferenceId;
 
@@ -106,7 +116,11 @@ public class ContextEnginePlugin extends Plugin implements SystemIndexPlugin {
 
     @Override
     public List<Setting<?>> getSettings() {
-        return List.of(SESSION_MEMORY_INFERENCE_ID, AiIndexTemplateRegistry.AI_INDEX_REGISTRY_ENABLED);
+        return List.of(
+            SESSION_MEMORY_INFERENCE_ID,
+            SESSION_MEMORY_REDACTION_INFERENCE_ID,
+            AiIndexTemplateRegistry.AI_INDEX_REGISTRY_ENABLED
+        );
     }
 
     @Override

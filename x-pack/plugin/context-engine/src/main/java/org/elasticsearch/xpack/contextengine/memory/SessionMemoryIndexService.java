@@ -15,10 +15,17 @@ import org.elasticsearch.client.internal.Client;
 import org.elasticsearch.client.internal.OriginSettingClient;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.UUIDs;
+import org.elasticsearch.core.Nullable;
 import org.elasticsearch.index.IndexNotFoundException;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.inference.InferenceServiceResults;
+import org.elasticsearch.inference.TaskType;
+import org.elasticsearch.inference.UnifiedCompletionRequest;
+import org.elasticsearch.inference.UnifiedCompletionRequestBody;
+import org.elasticsearch.inference.completion.ContentString;
+import org.elasticsearch.inference.completion.Message;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.sort.SortOrder;
@@ -31,6 +38,8 @@ import org.elasticsearch.xcontent.XContentType;
 import org.elasticsearch.xpack.contextengine.ContextEnginePlugin;
 import org.elasticsearch.xpack.contextengine.memory.action.ListSessionMemoryAction;
 import org.elasticsearch.xpack.contextengine.memory.action.SearchSessionMemoryAction;
+import org.elasticsearch.xpack.core.inference.action.UnifiedCompletionAction;
+import org.elasticsearch.xpack.core.inference.results.completion.ChatCompletionChunkResponse;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -52,11 +61,64 @@ public class SessionMemoryIndexService {
         this.clientWithOrigin = new OriginSettingClient(client, CONTEXT_ENGINE_ORIGIN);
     }
 
+    static final String REDACTION_PROMPT = "Rewrite the text between the <text> tags with every piece of personally identifiable "
+        + "information (names, email addresses, phone numbers, postal addresses, government or account identifiers) replaced by a "
+        + "placeholder such as <NAME>, <EMAIL>, <PHONE>, <ADDRESS> or <ID>. Keep everything else exactly as written and return only "
+        + "the rewritten text.";
+
     /**
      * Appends one memory to the data stream, assigning an id when the caller did not supply one. A caller-supplied id revises
-     * an existing memory: the revision is a new document carrying the same id.
+     * an existing memory: the revision is a new document carrying the same id. When {@code redactionInferenceId} is set the
+     * content is first rewritten by that {@code chat_completion} endpoint, so the stored content, the {@code inputs} embedding
+     * and the response all carry the redacted text.
      */
-    public void remember(SessionMemory memory, ActionListener<SessionMemory> listener) {
+    public void remember(SessionMemory memory, @Nullable String redactionInferenceId, ActionListener<SessionMemory> listener) {
+        if (Strings.isNullOrEmpty(redactionInferenceId) || memory.content() == null) {
+            index(memory, listener);
+            return;
+        }
+        redact(
+            memory.content(),
+            redactionInferenceId,
+            listener.delegateFailureAndWrap((l, redacted) -> index(memory.withContent(redacted), l))
+        );
+    }
+
+    private void redact(String content, String inferenceId, ActionListener<String> listener) {
+        Message prompt = new Message(
+            new ContentString(REDACTION_PROMPT + "\n<text>\n" + content + "\n</text>"),
+            "user",
+            null,
+            null,
+            null,
+            null
+        );
+        UnifiedCompletionAction.Request request = new UnifiedCompletionAction.Request(
+            inferenceId,
+            TaskType.CHAT_COMPLETION,
+            new UnifiedCompletionRequest(UnifiedCompletionRequestBody.of(List.of(prompt)), false),
+            null
+        );
+        clientWithOrigin.execute(
+            UnifiedCompletionAction.INSTANCE,
+            request,
+            listener.map(response -> redactedContent(response.getResults()))
+        );
+    }
+
+    static String redactedContent(InferenceServiceResults results) {
+        if (results instanceof ChatCompletionChunkResponse completion
+            && completion.choices() != null
+            && completion.choices().isEmpty() == false) {
+            String content = completion.choices().get(0).message().content();
+            if (content != null) {
+                return content.strip();
+            }
+        }
+        throw new IllegalStateException("redaction endpoint returned no content");
+    }
+
+    private void index(SessionMemory memory, ActionListener<SessionMemory> listener) {
         try {
             String id = Strings.isNullOrEmpty(memory.id()) ? UUIDs.randomBase64UUID() : memory.id();
             SessionMemory stored = memory.withIdAndTimestamp(id, Instant.now().truncatedTo(ChronoUnit.MILLIS));

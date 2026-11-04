@@ -220,6 +220,13 @@ public class SessionMemory implements Writeable, ToXContentObject {
         return new SessionMemory(timestamp, id, space, aiIndexIds, sessionId, userId, content, media, attributes);
     }
 
+    /**
+     * Returns a copy with the given content, used after redaction.
+     */
+    public SessionMemory withContent(String content) {
+        return new SessionMemory(timestamp, id, space, aiIndexIds, sessionId, userId, content, media, attributes);
+    }
+
     @Nullable
     public Instant timestamp() {
         return timestamp;
