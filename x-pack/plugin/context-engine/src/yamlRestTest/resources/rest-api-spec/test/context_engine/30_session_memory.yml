@@ -24,6 +24,19 @@
   - match: { error.reason: "/.*\\[@timestamp\\].*/" }
 
 ---
+"Remember rejects a caller-supplied extracted_content":
+  - do:
+      catch: bad_request
+      context_engine.remember:
+        body:
+          session_id: "session-1"
+          user_id: "user-1"
+          content: "the user prefers dark mode"
+          extracted_content: "text from a document"
+
+  - match: { error.reason: "/.*\\[extracted_content\\].*/" }
+
+---
 "List session memory returns nothing for an unknown session":
   - do:
       context_engine.list_session_memory:

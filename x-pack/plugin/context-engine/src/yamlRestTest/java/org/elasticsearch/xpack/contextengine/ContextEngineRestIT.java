@@ -10,12 +10,14 @@ package org.elasticsearch.xpack.contextengine;
 import com.carrotsearch.randomizedtesting.annotations.Name;
 import com.carrotsearch.randomizedtesting.annotations.ParametersFactory;
 
+import org.elasticsearch.client.Request;
 import org.elasticsearch.common.settings.SecureString;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.util.concurrent.ThreadContext;
 import org.elasticsearch.test.cluster.ElasticsearchCluster;
 import org.elasticsearch.test.rest.yaml.ClientYamlTestCandidate;
 import org.elasticsearch.test.rest.yaml.ESClientYamlSuiteTestCase;
+import org.junit.Before;
 import org.junit.ClassRule;
 
 public class ContextEngineRestIT extends ESClientYamlSuiteTestCase {
@@ -28,8 +30,10 @@ public class ContextEngineRestIT extends ESClientYamlSuiteTestCase {
         .module("x-pack-context-engine")
         .module("data-streams")
         .module("x-pack-inference")
+        .module("x-pack-redact")
         .plugin("inference-service-test")
         .setting("xpack.context_engine.session_memory.inference_id", "test-embedding")
+        .setting("xpack.context_engine.session_memory.extraction_inference_id", "test-extraction")
         .setting("xpack.security.enabled", "true")
         .setting("xpack.license.self_generated.type", "trial")
         .user(USER, PASSWORD)
@@ -42,6 +46,15 @@ public class ContextEngineRestIT extends ESClientYamlSuiteTestCase {
     @ParametersFactory
     public static Iterable<Object[]> parameters() throws Exception {
         return createParameters();
+    }
+
+    /**
+     * The session memory data stream names the pipeline as its default pipeline, and the registry installs it after the
+     * cluster forms, so a remember that runs before then would fail.
+     */
+    @Before
+    public void waitForSessionMemoryPipeline() throws Exception {
+        assertBusy(() -> assertOK(adminClient().performRequest(new Request("GET", "/_ingest/pipeline/context-engine-session-memory"))));
     }
 
     @Override

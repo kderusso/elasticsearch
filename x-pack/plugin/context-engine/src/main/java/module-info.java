@@ -19,4 +19,5 @@ module org.elasticsearch.xpack.contextengine {
     exports org.elasticsearch.xpack.contextengine.events.action;
     exports org.elasticsearch.xpack.contextengine.memory;
     exports org.elasticsearch.xpack.contextengine.memory.action;
+    exports org.elasticsearch.xpack.contextengine.memory.ingest;
 }

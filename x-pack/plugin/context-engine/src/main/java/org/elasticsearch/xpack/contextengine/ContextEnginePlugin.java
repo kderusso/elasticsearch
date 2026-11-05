@@ -26,6 +26,8 @@ import org.elasticsearch.features.NodeFeature;
 import org.elasticsearch.indices.ExecutorNames;
 import org.elasticsearch.indices.SystemDataStreamDescriptor;
 import org.elasticsearch.indices.SystemIndexDescriptor;
+import org.elasticsearch.ingest.Processor;
+import org.elasticsearch.plugins.IngestPlugin;
 import org.elasticsearch.plugins.Plugin;
 import org.elasticsearch.plugins.SystemIndexPlugin;
 import org.elasticsearch.rest.RestHandler;
@@ -61,6 +63,9 @@ import org.elasticsearch.xpack.contextengine.memory.action.TransportForgetAction
 import org.elasticsearch.xpack.contextengine.memory.action.TransportListSessionMemoryAction;
 import org.elasticsearch.xpack.contextengine.memory.action.TransportRememberAction;
 import org.elasticsearch.xpack.contextengine.memory.action.TransportSearchSessionMemoryAction;
+import org.elasticsearch.xpack.contextengine.memory.ingest.ExtractProcessor;
+import org.elasticsearch.xpack.contextengine.memory.ingest.SessionMemoryInputsProcessor;
+import org.elasticsearch.xpack.contextengine.memory.ingest.SessionMemoryPipelineRegistry;
 import org.elasticsearch.xpack.core.template.TemplateUtils;
 
 import java.io.IOException;
@@ -74,9 +79,10 @@ import java.util.function.Supplier;
 import static org.elasticsearch.xpack.core.ClientHelper.CONTEXT_ENGINE_ORIGIN;
 
 /**
- * Hosts the Context Engine system data streams and the REST and transport actions that operate on them.
+ * Hosts the Context Engine system data streams, the REST and transport actions that operate on them, and the ingest
+ * processors and pipeline that extract text from and redact session memories before they are embedded.
  */
-public class ContextEnginePlugin extends Plugin implements SystemIndexPlugin {
+public class ContextEnginePlugin extends Plugin implements SystemIndexPlugin, IngestPlugin {
 
     public static final String FEATURE_NAME = "context_engine";
 
@@ -99,6 +105,37 @@ public class ContextEnginePlugin extends Plugin implements SystemIndexPlugin {
         Setting.Property.NodeScope
     );
 
+    /**
+     * Whether a memory's {@code content} and extracted content have their email addresses, IP addresses and phone numbers
+     * replaced by placeholders before the memory is stored. When disabled the session memory pipeline has no {@code redact}
+     * processors and the text is stored as sent.
+     */
+    public static final Setting<Boolean> SESSION_MEMORY_REDACTION_ENABLED = Setting.boolSetting(
+        "xpack.context_engine.session_memory.redaction.enabled",
+        true,
+        Setting.Property.NodeScope
+    );
+
+    /**
+     * Whether a memory's PDF, image and HTML media are turned into text before the memory is stored. When disabled the
+     * session memory pipeline has no extraction processor and no extracted content is stored.
+     */
+    public static final Setting<Boolean> SESSION_MEMORY_EXTRACTION_ENABLED = Setting.boolSetting(
+        "xpack.context_engine.session_memory.extraction.enabled",
+        true,
+        Setting.Property.NodeScope
+    );
+
+    /**
+     * The {@code document_extraction} endpoint that turns a memory's PDF, image and HTML media into text before the memory is
+     * stored. The default is the preconfigured EIS Jina Reader endpoint.
+     */
+    public static final Setting<String> SESSION_MEMORY_EXTRACTION_INFERENCE_ID = Setting.simpleString(
+        "xpack.context_engine.session_memory.extraction_inference_id",
+        ".jina-reader",
+        Setting.Property.NodeScope
+    );
+
     private final Settings settings;
     private final String sessionMemoryInferenceId;
 
@@ -109,7 +146,13 @@ public class ContextEnginePlugin extends Plugin implements SystemIndexPlugin {
 
     @Override
     public List<Setting<?>> getSettings() {
-        return List.of(SESSION_MEMORY_INFERENCE_ID, AiIndexTemplateRegistry.AI_INDEX_REGISTRY_ENABLED);
+        return List.of(
+            SESSION_MEMORY_INFERENCE_ID,
+            SESSION_MEMORY_REDACTION_ENABLED,
+            SESSION_MEMORY_EXTRACTION_ENABLED,
+            SESSION_MEMORY_EXTRACTION_INFERENCE_ID,
+            AiIndexTemplateRegistry.AI_INDEX_REGISTRY_ENABLED
+        );
     }
 
     @Override
@@ -123,7 +166,26 @@ public class ContextEnginePlugin extends Plugin implements SystemIndexPlugin {
             services.featureService()
         );
         aiIndexTemplateRegistry.initialize();
-        return List.of(aiIndexTemplateRegistry);
+        SessionMemoryPipelineRegistry sessionMemoryPipelineRegistry = new SessionMemoryPipelineRegistry(
+            settings,
+            services.clusterService(),
+            services.threadPool(),
+            services.client(),
+            services.xContentRegistry(),
+            services.featureService()
+        );
+        sessionMemoryPipelineRegistry.initialize();
+        return List.of(aiIndexTemplateRegistry, sessionMemoryPipelineRegistry);
+    }
+
+    @Override
+    public Map<String, Processor.Factory> getProcessors(Processor.Parameters parameters) {
+        return Map.of(
+            ExtractProcessor.TYPE,
+            new ExtractProcessor.Factory(parameters.client),
+            SessionMemoryInputsProcessor.TYPE,
+            new SessionMemoryInputsProcessor.Factory()
+        );
     }
 
     @Override

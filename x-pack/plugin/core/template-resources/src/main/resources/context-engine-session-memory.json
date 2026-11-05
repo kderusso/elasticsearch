@@ -11,6 +11,7 @@
     },
     "settings": {
       "index.auto_expand_replicas": "0-1",
+      "index.default_pipeline": "context-engine-session-memory",
       "index.sort.field": "@timestamp",
       "index.sort.order": "desc"
     },
@@ -40,6 +41,9 @@
           "type": "keyword"
         },
         "content": {
+          "type": "text"
+        },
+        "extracted_content": {
           "type": "text"
         },
         "inputs": {

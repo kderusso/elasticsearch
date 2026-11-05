@@ -89,6 +89,12 @@ public class RememberAction {
             if (memory.timestamp() != null) {
                 validationException = addValidationError("[@timestamp] is set at write time and cannot be provided", validationException);
             }
+            if (memory.extractedContent() != null) {
+                validationException = addValidationError(
+                    "[extracted_content] is set at write time and cannot be provided",
+                    validationException
+                );
+            }
             return validationException;
         }
 

@@ -39,6 +39,7 @@ import org.elasticsearch.xpack.contextengine.ContextEnginePlugin;
 import org.elasticsearch.xpack.contextengine.memory.action.ForgetAction;
 import org.elasticsearch.xpack.contextengine.memory.action.ListSessionMemoryAction;
 import org.elasticsearch.xpack.contextengine.memory.action.SearchSessionMemoryAction;
+import org.elasticsearch.xpack.contextengine.memory.ingest.SessionMemoryPipelineRegistry;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -66,7 +67,9 @@ public class SessionMemoryIndexService {
 
     /**
      * Appends one memory to the data stream, assigning an id when the caller did not supply one. A caller-supplied id revises
-     * an existing memory: the revision is a new document carrying the same id.
+     * an existing memory: the revision is a new document carrying the same id. The session memory pipeline extracts and
+     * redacts text during the write, so the stored document is read back and returned. The pipeline is set on the request
+     * because a system data stream's template is not cluster metadata, so the first write cannot resolve it as the default.
      */
     public void remember(SessionMemory memory, ActionListener<SessionMemory> listener) {
         try {
@@ -75,11 +78,23 @@ public class SessionMemoryIndexService {
             clientWithOrigin.prepareIndex(ContextEnginePlugin.SESSION_MEMORY_DATA_STREAM_NAME)
                 .setOpType(DocWriteRequest.OpType.CREATE)
                 .setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
+                .setPipeline(SessionMemoryPipelineRegistry.PIPELINE_NAME)
                 .setSource(stored.toXContent(jsonBuilder(), SessionMemory.STORED_PARAMS))
-                .execute(listener.delegateFailureAndWrap((l, indexResponse) -> l.onResponse(stored)));
+                .execute(listener.delegateFailureAndWrap((l, indexResponse) -> get(indexResponse.getIndex(), indexResponse.getId(), l)));
         } catch (Exception e) {
             listener.onFailure(e);
         }
+    }
+
+    private void get(String index, String docId, ActionListener<SessionMemory> listener) {
+        clientWithOrigin.prepareGet(index, docId).execute(listener.delegateFailureAndWrap((l, getResponse) -> {
+            try (
+                XContentParser parser = XContentType.JSON.xContent()
+                    .createParser(XContentParserConfiguration.EMPTY, getResponse.getSourceAsBytesRef().streamInput())
+            ) {
+                l.onResponse(SessionMemory.fromXContent(parser));
+            }
+        }));
     }
 
     /**
