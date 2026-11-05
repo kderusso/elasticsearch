@@ -31,6 +31,7 @@ public class ContextEngineRestIT extends ESClientYamlSuiteTestCase {
         .plugin("inference-service-test")
         .setting("xpack.context_engine.session_memory.inference_id", "test-embedding")
         .setting("xpack.context_engine.session_memory.redaction.enabled", "false")
+        .setting("xpack.context_engine.session_memory.extraction_inference_id", "test-extraction")
         .setting("xpack.security.enabled", "true")
         .setting("xpack.license.self_generated.type", "trial")
         .user(USER, PASSWORD)

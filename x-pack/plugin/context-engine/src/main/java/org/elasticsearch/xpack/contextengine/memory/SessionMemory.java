@@ -40,6 +40,7 @@ public class SessionMemory implements Writeable, ToXContentObject {
     public static final ParseField SESSION_ID_FIELD = new ParseField("session_id");
     public static final ParseField USER_ID_FIELD = new ParseField("user_id");
     public static final ParseField CONTENT_FIELD = new ParseField("content");
+    public static final ParseField EXTRACTED_CONTENT_FIELD = new ParseField("extracted_content");
     public static final ParseField MEDIA_FIELD = new ParseField("media");
     public static final ParseField INPUTS_FIELD = new ParseField("inputs");
     public static final ParseField ATTRIBUTES_FIELD = new ParseField("attributes");
@@ -62,7 +63,8 @@ public class SessionMemory implements Writeable, ToXContentObject {
             (String) args[5],
             (String) args[6],
             args[7] != null ? (List<Map<String, Object>>) args[7] : mediaFromInputs((List<Object>) args[9]),
-            (Map<String, Object>) args[8]
+            (Map<String, Object>) args[8],
+            (String) args[10]
         )
     );
 
@@ -77,6 +79,7 @@ public class SessionMemory implements Writeable, ToXContentObject {
         PARSER.declareObjectArray(optionalConstructorArg(), (p, c) -> p.map(), MEDIA_FIELD);
         PARSER.declareObject(optionalConstructorArg(), (p, c) -> p.map(), ATTRIBUTES_FIELD);
         PARSER.declareField(optionalConstructorArg(), (p, c) -> parseInputs(p), INPUTS_FIELD, ObjectParser.ValueType.OBJECT_ARRAY);
+        PARSER.declareString(optionalConstructorArg(), EXTRACTED_CONTENT_FIELD);
     }
 
     private static List<Object> parseInputs(XContentParser parser) throws IOException {
@@ -123,6 +126,8 @@ public class SessionMemory implements Writeable, ToXContentObject {
     private final List<Map<String, Object>> media;
     @Nullable
     private final Map<String, Object> attributes;
+    @Nullable
+    private final String extractedContent;
 
     public SessionMemory(
         @Nullable Instant timestamp,
@@ -135,6 +140,21 @@ public class SessionMemory implements Writeable, ToXContentObject {
         @Nullable List<Map<String, Object>> media,
         @Nullable Map<String, Object> attributes
     ) {
+        this(timestamp, id, space, aiIndexIds, sessionId, userId, content, media, attributes, null);
+    }
+
+    public SessionMemory(
+        @Nullable Instant timestamp,
+        @Nullable String id,
+        @Nullable String space,
+        @Nullable List<String> aiIndexIds,
+        String sessionId,
+        String userId,
+        @Nullable String content,
+        @Nullable List<Map<String, Object>> media,
+        @Nullable Map<String, Object> attributes,
+        @Nullable String extractedContent
+    ) {
         this.timestamp = timestamp;
         this.id = id;
         this.space = space;
@@ -144,6 +164,7 @@ public class SessionMemory implements Writeable, ToXContentObject {
         this.content = content;
         this.media = media == null ? List.of() : List.copyOf(media);
         this.attributes = attributes;
+        this.extractedContent = extractedContent;
     }
 
     public SessionMemory(StreamInput in) throws IOException {
@@ -156,6 +177,7 @@ public class SessionMemory implements Writeable, ToXContentObject {
         this.content = in.readOptionalString();
         this.media = in.readCollectionAsImmutableList(StreamInput::readGenericMap);
         this.attributes = in.readBoolean() ? in.readGenericMap() : null;
+        this.extractedContent = in.readOptionalString();
     }
 
     @Override
@@ -172,6 +194,7 @@ public class SessionMemory implements Writeable, ToXContentObject {
         if (attributes != null) {
             out.writeGenericMap(attributes);
         }
+        out.writeOptionalString(extractedContent);
     }
 
     @Override
@@ -194,10 +217,16 @@ public class SessionMemory implements Writeable, ToXContentObject {
         if (content != null) {
             builder.field(CONTENT_FIELD.getPreferredName(), content);
         }
+        if (extractedContent != null) {
+            builder.field(EXTRACTED_CONTENT_FIELD.getPreferredName(), extractedContent);
+        }
         if (params.paramAsBoolean("stored", false)) {
             List<Object> inputs = new ArrayList<>();
             if (content != null) {
                 inputs.add(content);
+            }
+            if (extractedContent != null) {
+                inputs.add(extractedContent);
             }
             inputs.addAll(media);
             if (inputs.isEmpty() == false) {
@@ -217,14 +246,21 @@ public class SessionMemory implements Writeable, ToXContentObject {
      * Returns a copy with the given id and write time, used when the document is first stored.
      */
     public SessionMemory withIdAndTimestamp(String id, Instant timestamp) {
-        return new SessionMemory(timestamp, id, space, aiIndexIds, sessionId, userId, content, media, attributes);
+        return new SessionMemory(timestamp, id, space, aiIndexIds, sessionId, userId, content, media, attributes, extractedContent);
     }
 
     /**
      * Returns a copy with the given content, used after redaction.
      */
     public SessionMemory withContent(String content) {
-        return new SessionMemory(timestamp, id, space, aiIndexIds, sessionId, userId, content, media, attributes);
+        return new SessionMemory(timestamp, id, space, aiIndexIds, sessionId, userId, content, media, attributes, extractedContent);
+    }
+
+    /**
+     * Returns a copy with the given extracted content, used after text extraction and redaction.
+     */
+    public SessionMemory withExtractedContent(@Nullable String extractedContent) {
+        return new SessionMemory(timestamp, id, space, aiIndexIds, sessionId, userId, content, media, attributes, extractedContent);
     }
 
     @Nullable
@@ -272,6 +308,14 @@ public class SessionMemory implements Writeable, ToXContentObject {
         return attributes;
     }
 
+    /**
+     * The text extracted from the media at write time, stored next to the content and embedded with it.
+     */
+    @Nullable
+    public String extractedContent() {
+        return extractedContent;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -285,11 +329,12 @@ public class SessionMemory implements Writeable, ToXContentObject {
             && Objects.equals(userId, that.userId)
             && Objects.equals(content, that.content)
             && Objects.equals(media, that.media)
-            && Objects.equals(attributes, that.attributes);
+            && Objects.equals(attributes, that.attributes)
+            && Objects.equals(extractedContent, that.extractedContent);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(timestamp, id, space, aiIndexIds, sessionId, userId, content, media, attributes);
+        return Objects.hash(timestamp, id, space, aiIndexIds, sessionId, userId, content, media, attributes, extractedContent);
     }
 }

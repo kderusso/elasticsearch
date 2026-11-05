@@ -42,6 +42,9 @@
         "content": {
           "type": "text"
         },
+        "extracted_content": {
+          "type": "text"
+        },
         "inputs": {
           "type": "semantic",
           "inference_id": "${xpack.contextengine.session_memory.inference_id}"

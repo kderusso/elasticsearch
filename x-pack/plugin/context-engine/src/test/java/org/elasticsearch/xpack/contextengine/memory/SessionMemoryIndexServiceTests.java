@@ -15,6 +15,7 @@ import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.support.PlainActionFuture;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.WrapperQueryBuilder;
+import org.elasticsearch.inference.DataType;
 import org.elasticsearch.inference.TaskType;
 import org.elasticsearch.inference.completion.ContentString;
 import org.elasticsearch.inference.completion.Message;
@@ -26,8 +27,10 @@ import org.elasticsearch.xcontent.XContentParser;
 import org.elasticsearch.xcontent.XContentParserConfiguration;
 import org.elasticsearch.xcontent.XContentType;
 import org.elasticsearch.xpack.contextengine.ContextEnginePlugin;
+import org.elasticsearch.xpack.core.inference.action.DocumentExtractionAction;
 import org.elasticsearch.xpack.core.inference.action.InferenceAction;
 import org.elasticsearch.xpack.core.inference.action.UnifiedCompletionAction;
+import org.elasticsearch.xpack.core.inference.results.DocumentExtractionResults;
 import org.elasticsearch.xpack.core.inference.results.completion.ChatCompletionChoiceResponse;
 import org.elasticsearch.xpack.core.inference.results.completion.ChatCompletionChunkResponse;
 import org.elasticsearch.xpack.core.inference.results.completion.ChatCompletionMessageResponse;
@@ -36,6 +39,7 @@ import org.junit.Before;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -53,10 +57,12 @@ import static org.hamcrest.Matchers.nullValue;
 public class SessionMemoryIndexServiceTests extends ESTestCase {
 
     private static final String REDACTED = "Call me at <PHONE>";
+    private static final String EXTRACTED = "# Page one";
 
     private ThreadPool threadPool;
     private AtomicReference<IndexRequest> indexed;
     private List<UnifiedCompletionAction.Request> redactionRequests;
+    private List<DocumentExtractionAction.Request> extractionRequests;
     private SessionMemoryIndexService service;
 
     @Before
@@ -64,7 +70,9 @@ public class SessionMemoryIndexServiceTests extends ESTestCase {
         threadPool = new TestThreadPool(getTestName());
         indexed = new AtomicReference<>();
         redactionRequests = new ArrayList<>();
-        // answers redaction requests with a fixed completion and captures the index request instead of writing
+        extractionRequests = new ArrayList<>();
+        // answers redaction requests with a fixed completion, extraction requests with one fixed page per input, and captures
+        // the index request instead of writing
         service = new SessionMemoryIndexService(new NoOpClient(threadPool) {
             @Override
             @SuppressWarnings("unchecked")
@@ -76,6 +84,10 @@ public class SessionMemoryIndexServiceTests extends ESTestCase {
                 if (request instanceof UnifiedCompletionAction.Request redaction) {
                     redactionRequests.add(redaction);
                     listener.onResponse((Response) new InferenceAction.Response(completion(REDACTED)));
+                } else if (request instanceof DocumentExtractionAction.Request extraction) {
+                    extractionRequests.add(extraction);
+                    int inputs = extraction.getDocumentExtractionRequest().inputs().size();
+                    listener.onResponse((Response) new InferenceAction.Response(extractionResults(inputs)));
                 } else {
                     indexed.set((IndexRequest) request);
                     listener.onResponse(null);
@@ -92,7 +104,7 @@ public class SessionMemoryIndexServiceTests extends ESTestCase {
     public void testRememberRedactsContent() {
         SessionMemory memory = randomSessionMemory();
         PlainActionFuture<SessionMemory> future = new PlainActionFuture<>();
-        service.remember(memory, "redact-llm", future);
+        service.remember(memory.withExtractedContent(null), "redact-llm", null, future);
 
         assertThat(future.actionGet().content(), equalTo(REDACTED));
         assertThat(redactionRequests, hasSize(1));
@@ -111,7 +123,7 @@ public class SessionMemoryIndexServiceTests extends ESTestCase {
     public void testRememberSkipsRedactionWithoutContent() {
         SessionMemory memory = new SessionMemory(null, null, null, null, "session-1", "user-1", null, randomMedia(), null);
         PlainActionFuture<SessionMemory> future = new PlainActionFuture<>();
-        service.remember(memory, "redact-llm", future);
+        service.remember(memory, "redact-llm", null, future);
 
         assertThat(future.actionGet().content(), nullValue());
         assertThat(redactionRequests, empty());
@@ -126,11 +138,67 @@ public class SessionMemoryIndexServiceTests extends ESTestCase {
     public void testRememberWithoutRedaction() {
         SessionMemory memory = randomSessionMemory();
         PlainActionFuture<SessionMemory> future = new PlainActionFuture<>();
-        service.remember(memory, randomBoolean() ? null : "", future);
+        service.remember(memory, randomBoolean() ? null : "", randomBoolean() ? null : "", future);
 
         assertThat(future.actionGet().content(), equalTo(memory.content()));
         assertThat(redactionRequests, empty());
+        assertThat(extractionRequests, empty());
         assertThat(indexed.get().index(), equalTo(ContextEnginePlugin.SESSION_MEMORY_DATA_STREAM_NAME));
+    }
+
+    public void testRememberExtractsMedia() {
+        List<Map<String, Object>> media = randomMedia();
+        SessionMemory memory = new SessionMemory(null, null, null, null, "session-1", "user-1", "a note", media, null);
+        PlainActionFuture<SessionMemory> future = new PlainActionFuture<>();
+        service.remember(memory, null, "extract-docs", future);
+
+        String expected = String.join("\n\n", Collections.nCopies(media.size(), EXTRACTED));
+        assertThat(future.actionGet().extractedContent(), equalTo(expected));
+        assertThat(extractionRequests, hasSize(1));
+        DocumentExtractionAction.Request request = extractionRequests.get(0);
+        assertThat(request.getInferenceEntityId(), equalTo("extract-docs"));
+        assertThat(request.getDocumentExtractionRequest().inputs(), hasSize(media.size()));
+        assertThat(
+            request.getDocumentExtractionRequest().inputs().get(0).dataType(),
+            equalTo(DataType.fromString((String) media.get(0).get("type")))
+        );
+        assertThat(redactionRequests, empty());
+        Map<String, Object> source = indexed.get().sourceAsMap();
+        assertThat(source.get("extracted_content"), equalTo(expected));
+        assertThat(((List<?>) source.get("inputs")).get(1), equalTo(expected));
+    }
+
+    public void testRememberRedactsExtractedContent() {
+        SessionMemory memory = new SessionMemory(null, null, null, null, "session-1", "user-1", "a note", randomMedia(), null);
+        PlainActionFuture<SessionMemory> future = new PlainActionFuture<>();
+        service.remember(memory, "redact-llm", "extract-docs", future);
+
+        SessionMemory stored = future.actionGet();
+        assertThat(stored.content(), equalTo(REDACTED));
+        assertThat(stored.extractedContent(), equalTo(REDACTED));
+        assertThat(extractionRequests, hasSize(1));
+        assertThat(redactionRequests, hasSize(2));
+        assertThat(
+            ((ContentString) redactionRequests.get(1).getUnifiedCompletionRequest().body().messages().get(0).content()).content(),
+            containsString(EXTRACTED)
+        );
+    }
+
+    public void testRememberSkipsExtractionWithoutMedia() {
+        SessionMemory memory = new SessionMemory(null, null, null, null, "session-1", "user-1", "a note", null, null);
+        PlainActionFuture<SessionMemory> future = new PlainActionFuture<>();
+        service.remember(memory, null, "extract-docs", future);
+
+        assertThat(future.actionGet().extractedContent(), nullValue());
+        assertThat(extractionRequests, empty());
+        assertThat(indexed.get().sourceAsMap().get("extracted_content"), nullValue());
+    }
+
+    public void testExtractedContentWithoutResults() {
+        expectThrows(
+            IllegalStateException.class,
+            () -> SessionMemoryIndexService.extractedContent(new DocumentExtractionResults(List.of()))
+        );
     }
 
     public void testKnnQuery() throws IOException {
@@ -169,6 +237,12 @@ public class SessionMemoryIndexServiceTests extends ESTestCase {
             "model",
             "chat.completion",
             null
+        );
+    }
+
+    private static DocumentExtractionResults extractionResults(int inputs) {
+        return new DocumentExtractionResults(
+            Collections.nCopies(inputs, new DocumentExtractionResults.Result(EXTRACTED, "markdown", Map.of()))
         );
     }
 

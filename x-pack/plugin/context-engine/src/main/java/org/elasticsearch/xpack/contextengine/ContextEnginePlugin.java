@@ -119,6 +119,26 @@ public class ContextEnginePlugin extends Plugin implements SystemIndexPlugin {
         Setting.Property.NodeScope
     );
 
+    /**
+     * Whether a memory's PDF, image and HTML media are turned into text before the memory is stored. When disabled no
+     * extracted content is stored.
+     */
+    public static final Setting<Boolean> SESSION_MEMORY_EXTRACTION_ENABLED = Setting.boolSetting(
+        "xpack.context_engine.session_memory.extraction.enabled",
+        true,
+        Setting.Property.NodeScope
+    );
+
+    /**
+     * The {@code document_extraction} endpoint that turns a memory's PDF, image and HTML media into text before the memory is
+     * stored. The default is the preconfigured EIS Jina Reader endpoint.
+     */
+    public static final Setting<String> SESSION_MEMORY_EXTRACTION_INFERENCE_ID = Setting.simpleString(
+        "xpack.context_engine.session_memory.extraction_inference_id",
+        ".jina-reader",
+        Setting.Property.NodeScope
+    );
+
     private final Settings settings;
     private final String sessionMemoryInferenceId;
 
@@ -133,6 +153,8 @@ public class ContextEnginePlugin extends Plugin implements SystemIndexPlugin {
             SESSION_MEMORY_INFERENCE_ID,
             SESSION_MEMORY_REDACTION_ENABLED,
             SESSION_MEMORY_REDACTION_INFERENCE_ID,
+            SESSION_MEMORY_EXTRACTION_ENABLED,
+            SESSION_MEMORY_EXTRACTION_INFERENCE_ID,
             AiIndexTemplateRegistry.AI_INDEX_REGISTRY_ENABLED
         );
     }

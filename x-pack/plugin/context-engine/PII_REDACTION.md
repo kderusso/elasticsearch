@@ -45,6 +45,20 @@ Nothing in Elasticsearch produces redacted image or PDF bytes. There are three w
 
 The first two drop the media bytes, so the embedding covers text instead of the file. Returning a redacted image or PDF would need a new inference task type that takes media in and returns media out.
 
+## Text extraction
+
+`xpack.context_engine.session_memory.extraction.enabled` defaults to `true`, and `xpack.context_engine.session_memory.extraction_inference_id` defaults to `.jina-reader`, the preconfigured EIS Jina Reader endpoint for the `document_extraction` task type. It accepts PDF, image and HTML inputs, with OCR for scanned pages through the `preset: ocr` task setting. The endpoint is in preview and is authorized per account and region, so a cluster without it should set `enabled` to `false`, or name another `document_extraction` endpoint.
+
+When set, `remember` first sends the memory's PDF, image and HTML media to the endpoint and stores the returned text, one block per item separated by blank lines, as `extracted_content`. The media bytes are kept as they are. The extracted text is:
+
+- redacted together with `content` when redaction is on, so PII inside a scanned document does not survive;
+- added to the `inputs` semantic field, so the memory is also found by the words in its documents;
+- returned by remember, list and search, so recall can describe a PDF instead of only reporting that one exists.
+
+`extracted_content` cannot be supplied by the caller.
+
+Extraction is not possible in an ingest pipeline for the same reason as LLM redaction: the `inference` processor only sends text, and no processor speaks the `document_extraction` task type. The Tika `attachment` processor would cover embedded PDF text but has no OCR.
+
 ## Running it locally
 
 Start Elasticsearch:
@@ -75,4 +89,11 @@ To use a different endpoint, or to disable redaction:
 ```
 ./gradlew run -Dtests.es.xpack.context_engine.session_memory.redaction_inference_id=my-llm
 ./gradlew run -Dtests.es.xpack.context_engine.session_memory.redaction.enabled=false
+```
+
+To use a different `document_extraction` endpoint, or to disable extraction:
+
+```
+./gradlew run -Dtests.es.xpack.context_engine.session_memory.extraction_inference_id=my-extractor
+./gradlew run -Dtests.es.xpack.context_engine.session_memory.extraction.enabled=false
 ```

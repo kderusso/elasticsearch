@@ -23,6 +23,7 @@ public class TransportRememberAction extends HandledTransportAction<RememberActi
 
     private final SessionMemoryIndexService sessionMemoryIndexService;
     private final String redactionInferenceId;
+    private final String extractionInferenceId;
 
     @Inject
     public TransportRememberAction(Settings settings, TransportService transportService, ActionFilters actionFilters, Client client) {
@@ -31,10 +32,18 @@ public class TransportRememberAction extends HandledTransportAction<RememberActi
         this.redactionInferenceId = ContextEnginePlugin.SESSION_MEMORY_REDACTION_ENABLED.get(settings)
             ? ContextEnginePlugin.SESSION_MEMORY_REDACTION_INFERENCE_ID.get(settings)
             : null;
+        this.extractionInferenceId = ContextEnginePlugin.SESSION_MEMORY_EXTRACTION_ENABLED.get(settings)
+            ? ContextEnginePlugin.SESSION_MEMORY_EXTRACTION_INFERENCE_ID.get(settings)
+            : null;
     }
 
     @Override
     protected void doExecute(Task task, RememberAction.Request request, ActionListener<RememberAction.Response> listener) {
-        sessionMemoryIndexService.remember(request.memory(), redactionInferenceId, listener.map(RememberAction.Response::new));
+        sessionMemoryIndexService.remember(
+            request.memory(),
+            redactionInferenceId,
+            extractionInferenceId,
+            listener.map(RememberAction.Response::new)
+        );
     }
 }

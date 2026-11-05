@@ -26,7 +26,11 @@ import org.elasticsearch.index.IndexNotFoundException;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.inference.DataFormat;
+import org.elasticsearch.inference.DataType;
+import org.elasticsearch.inference.DocumentExtractionRequest;
 import org.elasticsearch.inference.InferenceServiceResults;
+import org.elasticsearch.inference.InferenceString;
 import org.elasticsearch.inference.TaskType;
 import org.elasticsearch.inference.UnifiedCompletionRequest;
 import org.elasticsearch.inference.UnifiedCompletionRequestBody;
@@ -46,7 +50,9 @@ import org.elasticsearch.xpack.contextengine.ContextEnginePlugin;
 import org.elasticsearch.xpack.contextengine.memory.action.ForgetAction;
 import org.elasticsearch.xpack.contextengine.memory.action.ListSessionMemoryAction;
 import org.elasticsearch.xpack.contextengine.memory.action.SearchSessionMemoryAction;
+import org.elasticsearch.xpack.core.inference.action.DocumentExtractionAction;
 import org.elasticsearch.xpack.core.inference.action.UnifiedCompletionAction;
+import org.elasticsearch.xpack.core.inference.results.DocumentExtractionResults;
 import org.elasticsearch.xpack.core.inference.results.completion.ChatCompletionChunkResponse;
 
 import java.io.IOException;
@@ -56,6 +62,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.elasticsearch.xcontent.XContentFactory.jsonBuilder;
 import static org.elasticsearch.xpack.core.ClientHelper.CONTEXT_ENGINE_ORIGIN;
@@ -80,25 +87,90 @@ public class SessionMemoryIndexService {
 
     /**
      * Appends one memory to the data stream, assigning an id when the caller did not supply one. A caller-supplied id revises
-     * an existing memory: the revision is a new document carrying the same id. When {@code redactionInferenceId} is set the
-     * content is first rewritten by that {@code chat_completion} endpoint, so the stored content, the {@code inputs} embedding
-     * and the response all carry the redacted text.
+     * an existing memory: the revision is a new document carrying the same id. When {@code extractionInferenceId} is set the
+     * text of the memory's PDF, image and HTML media is first extracted by that {@code document_extraction} endpoint into the
+     * extracted content. When {@code redactionInferenceId} is set the content and the extracted content are then rewritten by
+     * that {@code chat_completion} endpoint, so the stored document, the {@code inputs} embedding and the response all carry
+     * the redacted text.
      */
-    public void remember(SessionMemory memory, @Nullable String redactionInferenceId, ActionListener<SessionMemory> listener) {
-        if (Strings.isNullOrEmpty(redactionInferenceId) || memory.content() == null) {
-            index(memory, listener);
-            return;
-        }
-        redact(
-            memory.content(),
-            redactionInferenceId,
-            listener.delegateFailureAndWrap((l, redacted) -> index(memory.withContent(redacted), l))
+    public void remember(
+        SessionMemory memory,
+        @Nullable String redactionInferenceId,
+        @Nullable String extractionInferenceId,
+        ActionListener<SessionMemory> listener
+    ) {
+        extract(
+            memory,
+            extractionInferenceId,
+            listener.delegateFailureAndWrap(
+                (l, extracted) -> redact(extracted, redactionInferenceId, l.delegateFailureAndWrap((l2, redacted) -> index(redacted, l2)))
+            )
         );
     }
 
-    private void redact(String content, String inferenceId, ActionListener<String> listener) {
+    private void extract(SessionMemory memory, @Nullable String inferenceId, ActionListener<SessionMemory> listener) {
+        List<InferenceString> inputs = extractableInputs(memory.media());
+        if (Strings.isNullOrEmpty(inferenceId) || inputs.isEmpty()) {
+            listener.onResponse(memory);
+            return;
+        }
+        DocumentExtractionAction.Request request = new DocumentExtractionAction.Request(
+            inferenceId,
+            new DocumentExtractionRequest(inputs, Map.of()),
+            null
+        );
+        clientWithOrigin.execute(
+            DocumentExtractionAction.INSTANCE,
+            request,
+            listener.map(response -> memory.withExtractedContent(extractedContent(response.getResults())))
+        );
+    }
+
+    static List<InferenceString> extractableInputs(List<Map<String, Object>> media) {
+        List<InferenceString> inputs = new ArrayList<>();
+        for (Map<String, Object> item : media) {
+            DataType type = DataType.fromString((String) item.get("type"));
+            if (DocumentExtractionRequest.SUPPORTED_DOCUMENT_EXTRACTION_DATA_TYPES.contains(type)) {
+                Object format = item.get("format");
+                DataFormat dataFormat = format == null ? null : DataFormat.fromString((String) format);
+                inputs.add(new InferenceString(type, dataFormat, (String) item.get("value")));
+            }
+        }
+        return inputs;
+    }
+
+    static String extractedContent(InferenceServiceResults results) {
+        if (results instanceof DocumentExtractionResults extraction && extraction.results().isEmpty() == false) {
+            return extraction.results().stream().map(DocumentExtractionResults.Result::content).collect(Collectors.joining("\n\n"));
+        }
+        throw new IllegalStateException("extraction endpoint returned no content");
+    }
+
+    private void redact(SessionMemory memory, @Nullable String inferenceId, ActionListener<SessionMemory> listener) {
+        if (Strings.isNullOrEmpty(inferenceId)) {
+            listener.onResponse(memory);
+            return;
+        }
+        redactText(
+            memory.content(),
+            inferenceId,
+            listener.delegateFailureAndWrap(
+                (l, content) -> redactText(
+                    memory.extractedContent(),
+                    inferenceId,
+                    l.map(extracted -> memory.withContent(content).withExtractedContent(extracted))
+                )
+            )
+        );
+    }
+
+    private void redactText(@Nullable String text, String inferenceId, ActionListener<String> listener) {
+        if (text == null) {
+            listener.onResponse(null);
+            return;
+        }
         Message prompt = new Message(
-            new ContentString(REDACTION_PROMPT + "\n<text>\n" + content + "\n</text>"),
+            new ContentString(REDACTION_PROMPT + "\n<text>\n" + text + "\n</text>"),
             "user",
             null,
             null,

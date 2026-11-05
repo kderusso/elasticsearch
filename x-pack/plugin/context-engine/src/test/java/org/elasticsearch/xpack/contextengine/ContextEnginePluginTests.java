@@ -75,6 +75,19 @@ public class ContextEnginePluginTests extends ESTestCase {
         );
     }
 
+    public void testSessionMemoryExtractionInferenceId() {
+        assertThat(ContextEnginePlugin.SESSION_MEMORY_EXTRACTION_INFERENCE_ID.get(Settings.EMPTY), equalTo(".jina-reader"));
+        assertThat(
+            new ContextEnginePlugin(Settings.EMPTY).getSettings(),
+            hasItem(ContextEnginePlugin.SESSION_MEMORY_EXTRACTION_INFERENCE_ID)
+        );
+    }
+
+    public void testSessionMemoryExtractionEnabled() {
+        assertThat(ContextEnginePlugin.SESSION_MEMORY_EXTRACTION_ENABLED.get(Settings.EMPTY), equalTo(true));
+        assertThat(new ContextEnginePlugin(Settings.EMPTY).getSettings(), hasItem(ContextEnginePlugin.SESSION_MEMORY_EXTRACTION_ENABLED));
+    }
+
     public void testSessionMemoryRedactionEnabled() {
         assertThat(ContextEnginePlugin.SESSION_MEMORY_REDACTION_ENABLED.get(Settings.EMPTY), equalTo(true));
         assertThat(new ContextEnginePlugin(Settings.EMPTY).getSettings(), hasItem(ContextEnginePlugin.SESSION_MEMORY_REDACTION_ENABLED));

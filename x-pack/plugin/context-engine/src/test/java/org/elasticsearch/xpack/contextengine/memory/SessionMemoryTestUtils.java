@@ -28,7 +28,8 @@ public final class SessionMemoryTestUtils {
             ESTestCase.randomAlphaOfLength(8),
             ESTestCase.randomAlphaOfLengthBetween(1, 50),
             randomBoolean() ? null : randomMedia(),
-            randomBoolean() ? null : randomAttributes()
+            randomBoolean() ? null : randomAttributes(),
+            randomBoolean() ? null : ESTestCase.randomAlphaOfLengthBetween(1, 50)
         );
     }
 
