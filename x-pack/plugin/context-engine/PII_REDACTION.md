@@ -1,6 +1,6 @@
-# PII redaction for session memories
+# PII redaction and content extraction for session memories
 
-This document describes how PII in a memory's `content` is redacted before the memory is stored and embedded.
+This document describes how a memory's PDF, image and HTML media are turned into text by OCR, and how PII in the memory's `content` and extracted text is redacted, before the memory is stored and embedded.
 
 ## Where redaction has to happen
 
