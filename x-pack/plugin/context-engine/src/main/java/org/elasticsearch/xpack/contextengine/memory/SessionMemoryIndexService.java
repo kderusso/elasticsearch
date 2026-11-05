@@ -20,22 +20,11 @@ import org.elasticsearch.client.internal.Client;
 import org.elasticsearch.client.internal.OriginSettingClient;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.UUIDs;
-import org.elasticsearch.core.Nullable;
 import org.elasticsearch.core.Tuple;
 import org.elasticsearch.index.IndexNotFoundException;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
-import org.elasticsearch.inference.DataFormat;
-import org.elasticsearch.inference.DataType;
-import org.elasticsearch.inference.DocumentExtractionRequest;
-import org.elasticsearch.inference.InferenceServiceResults;
-import org.elasticsearch.inference.InferenceString;
-import org.elasticsearch.inference.TaskType;
-import org.elasticsearch.inference.UnifiedCompletionRequest;
-import org.elasticsearch.inference.UnifiedCompletionRequestBody;
-import org.elasticsearch.inference.completion.ContentString;
-import org.elasticsearch.inference.completion.Message;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.collapse.CollapseBuilder;
@@ -50,10 +39,7 @@ import org.elasticsearch.xpack.contextengine.ContextEnginePlugin;
 import org.elasticsearch.xpack.contextengine.memory.action.ForgetAction;
 import org.elasticsearch.xpack.contextengine.memory.action.ListSessionMemoryAction;
 import org.elasticsearch.xpack.contextengine.memory.action.SearchSessionMemoryAction;
-import org.elasticsearch.xpack.core.inference.action.DocumentExtractionAction;
-import org.elasticsearch.xpack.core.inference.action.UnifiedCompletionAction;
-import org.elasticsearch.xpack.core.inference.results.DocumentExtractionResults;
-import org.elasticsearch.xpack.core.inference.results.completion.ChatCompletionChunkResponse;
+import org.elasticsearch.xpack.contextengine.memory.ingest.SessionMemoryPipelineRegistry;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -62,7 +48,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static org.elasticsearch.xcontent.XContentFactory.jsonBuilder;
 import static org.elasticsearch.xpack.core.ClientHelper.CONTEXT_ENGINE_ORIGIN;
@@ -80,140 +65,36 @@ public class SessionMemoryIndexService {
         this.clientWithOrigin = new OriginSettingClient(client, CONTEXT_ENGINE_ORIGIN);
     }
 
-    static final String REDACTION_PROMPT = "Rewrite the text between the <text> tags with every piece of personally identifiable "
-        + "information (names, email addresses, phone numbers, postal addresses, government or account identifiers) replaced by a "
-        + "placeholder such as <NAME>, <EMAIL>, <PHONE>, <ADDRESS> or <ID>. Keep everything else exactly as written and return only "
-        + "the rewritten text.";
-
     /**
      * Appends one memory to the data stream, assigning an id when the caller did not supply one. A caller-supplied id revises
-     * an existing memory: the revision is a new document carrying the same id. When {@code extractionInferenceId} is set the
-     * text of the memory's PDF, image and HTML media is first extracted by that {@code document_extraction} endpoint into the
-     * extracted content. When {@code redactionInferenceId} is set the content and the extracted content are then rewritten by
-     * that {@code chat_completion} endpoint, so the stored document, the {@code inputs} embedding and the response all carry
-     * the redacted text.
+     * an existing memory: the revision is a new document carrying the same id. The session memory pipeline extracts and
+     * redacts text during the write, so the stored document is read back and returned. The pipeline is set on the request
+     * because a system data stream's template is not cluster metadata, so the first write cannot resolve it as the default.
      */
-    public void remember(
-        SessionMemory memory,
-        @Nullable String redactionInferenceId,
-        @Nullable String extractionInferenceId,
-        ActionListener<SessionMemory> listener
-    ) {
-        extract(
-            memory,
-            extractionInferenceId,
-            listener.delegateFailureAndWrap(
-                (l, extracted) -> redact(extracted, redactionInferenceId, l.delegateFailureAndWrap((l2, redacted) -> index(redacted, l2)))
-            )
-        );
-    }
-
-    private void extract(SessionMemory memory, @Nullable String inferenceId, ActionListener<SessionMemory> listener) {
-        List<InferenceString> inputs = extractableInputs(memory.media());
-        if (Strings.isNullOrEmpty(inferenceId) || inputs.isEmpty()) {
-            listener.onResponse(memory);
-            return;
-        }
-        DocumentExtractionAction.Request request = new DocumentExtractionAction.Request(
-            inferenceId,
-            new DocumentExtractionRequest(inputs, Map.of()),
-            null
-        );
-        clientWithOrigin.execute(
-            DocumentExtractionAction.INSTANCE,
-            request,
-            listener.map(response -> memory.withExtractedContent(extractedContent(response.getResults())))
-        );
-    }
-
-    static List<InferenceString> extractableInputs(List<Map<String, Object>> media) {
-        List<InferenceString> inputs = new ArrayList<>();
-        for (Map<String, Object> item : media) {
-            DataType type = DataType.fromString((String) item.get("type"));
-            if (DocumentExtractionRequest.SUPPORTED_DOCUMENT_EXTRACTION_DATA_TYPES.contains(type)) {
-                Object format = item.get("format");
-                DataFormat dataFormat = format == null ? null : DataFormat.fromString((String) format);
-                inputs.add(new InferenceString(type, dataFormat, (String) item.get("value")));
-            }
-        }
-        return inputs;
-    }
-
-    static String extractedContent(InferenceServiceResults results) {
-        if (results instanceof DocumentExtractionResults extraction && extraction.results().isEmpty() == false) {
-            return extraction.results().stream().map(DocumentExtractionResults.Result::content).collect(Collectors.joining("\n\n"));
-        }
-        throw new IllegalStateException("extraction endpoint returned no content");
-    }
-
-    private void redact(SessionMemory memory, @Nullable String inferenceId, ActionListener<SessionMemory> listener) {
-        if (Strings.isNullOrEmpty(inferenceId)) {
-            listener.onResponse(memory);
-            return;
-        }
-        redactText(
-            memory.content(),
-            inferenceId,
-            listener.delegateFailureAndWrap(
-                (l, content) -> redactText(
-                    memory.extractedContent(),
-                    inferenceId,
-                    l.map(extracted -> memory.withContent(content).withExtractedContent(extracted))
-                )
-            )
-        );
-    }
-
-    private void redactText(@Nullable String text, String inferenceId, ActionListener<String> listener) {
-        if (text == null) {
-            listener.onResponse(null);
-            return;
-        }
-        Message prompt = new Message(
-            new ContentString(REDACTION_PROMPT + "\n<text>\n" + text + "\n</text>"),
-            "user",
-            null,
-            null,
-            null,
-            null
-        );
-        UnifiedCompletionAction.Request request = new UnifiedCompletionAction.Request(
-            inferenceId,
-            TaskType.CHAT_COMPLETION,
-            new UnifiedCompletionRequest(UnifiedCompletionRequestBody.of(List.of(prompt)), false),
-            null
-        );
-        clientWithOrigin.execute(
-            UnifiedCompletionAction.INSTANCE,
-            request,
-            listener.map(response -> redactedContent(response.getResults()))
-        );
-    }
-
-    static String redactedContent(InferenceServiceResults results) {
-        if (results instanceof ChatCompletionChunkResponse completion
-            && completion.choices() != null
-            && completion.choices().isEmpty() == false) {
-            String content = completion.choices().get(0).message().content();
-            if (content != null) {
-                return content.strip();
-            }
-        }
-        throw new IllegalStateException("redaction endpoint returned no content");
-    }
-
-    private void index(SessionMemory memory, ActionListener<SessionMemory> listener) {
+    public void remember(SessionMemory memory, ActionListener<SessionMemory> listener) {
         try {
             String id = Strings.isNullOrEmpty(memory.id()) ? UUIDs.randomBase64UUID() : memory.id();
             SessionMemory stored = memory.withIdAndTimestamp(id, Instant.now().truncatedTo(ChronoUnit.MILLIS));
             clientWithOrigin.prepareIndex(ContextEnginePlugin.SESSION_MEMORY_DATA_STREAM_NAME)
                 .setOpType(DocWriteRequest.OpType.CREATE)
                 .setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
+                .setPipeline(SessionMemoryPipelineRegistry.PIPELINE_NAME)
                 .setSource(stored.toXContent(jsonBuilder(), SessionMemory.STORED_PARAMS))
-                .execute(listener.delegateFailureAndWrap((l, indexResponse) -> l.onResponse(stored)));
+                .execute(listener.delegateFailureAndWrap((l, indexResponse) -> get(indexResponse.getIndex(), indexResponse.getId(), l)));
         } catch (Exception e) {
             listener.onFailure(e);
         }
+    }
+
+    private void get(String index, String docId, ActionListener<SessionMemory> listener) {
+        clientWithOrigin.prepareGet(index, docId).execute(listener.delegateFailureAndWrap((l, getResponse) -> {
+            try (
+                XContentParser parser = XContentType.JSON.xContent()
+                    .createParser(XContentParserConfiguration.EMPTY, getResponse.getSourceAsBytesRef().streamInput())
+            ) {
+                l.onResponse(SessionMemory.fromXContent(parser));
+            }
+        }));
     }
 
     /**

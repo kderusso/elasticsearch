@@ -47,6 +47,39 @@ teardown:
         ignore: 404
 
 ---
+"Session memory pipeline is installed from the node settings":
+  - do:
+      ingest.get_pipeline:
+        id: "context-engine-session-memory"
+
+  - match: { context-engine-session-memory.version: 1 }
+  - length: { context-engine-session-memory.processors: 4 }
+  - match: { context-engine-session-memory.processors.0.context_engine_extract.inference_id: "test-extraction" }
+  - match: { context-engine-session-memory.processors.1.redact.field: "content" }
+  - match: { context-engine-session-memory.processors.2.redact.field: "extracted_content" }
+  - is_true: context-engine-session-memory.processors.3.context_engine_inputs
+
+---
+"Remember redacts PII in content and returns the placeholders":
+  - do:
+      context_engine.remember:
+        body:
+          id: "redacted"
+          session_id: "session-8"
+          user_id: "user-1"
+          content: "Mail kathleen@example.com or call 555-123-4567 from 10.1.2.3."
+
+  - match: { id: "redacted" }
+  - match: { content: "Mail <EMAIL> or call <PHONE> from <IP>." }
+
+  - do:
+      context_engine.list_session_memory:
+        session_id: "session-8"
+
+  - match: { count: 1 }
+  - match: { results.0.content: "Mail <EMAIL> or call <PHONE> from <IP>." }
+
+---
 "Remember stores text and image memories and list returns them newest first":
   - do:
       context_engine.remember:

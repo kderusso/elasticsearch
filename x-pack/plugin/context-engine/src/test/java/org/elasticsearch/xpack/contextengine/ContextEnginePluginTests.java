@@ -12,12 +12,21 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.core.TimeValue;
 import org.elasticsearch.indices.SystemDataStreamDescriptor;
 import org.elasticsearch.indices.SystemIndices;
+import org.elasticsearch.ingest.Processor;
 import org.elasticsearch.test.ESTestCase;
+import org.elasticsearch.test.client.NoOpClient;
+import org.elasticsearch.threadpool.TestThreadPool;
+import org.elasticsearch.threadpool.ThreadPool;
+import org.elasticsearch.xpack.contextengine.memory.ingest.ExtractProcessor;
+import org.elasticsearch.xpack.contextengine.memory.ingest.SessionMemoryInputsProcessor;
+import org.elasticsearch.xpack.contextengine.memory.ingest.SessionMemoryPipelineRegistry;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.elasticsearch.xpack.core.ClientHelper.CONTEXT_ENGINE_ORIGIN;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
@@ -67,12 +76,28 @@ public class ContextEnginePluginTests extends ESTestCase {
         assertThat(mappings, not(containsString("${")));
     }
 
-    public void testSessionMemoryRedactionInferenceId() {
-        assertThat(ContextEnginePlugin.SESSION_MEMORY_REDACTION_INFERENCE_ID.get(Settings.EMPTY), equalTo(".rainbow-sprinkles-elastic"));
+    public void testSessionMemoryDefaultPipeline() {
+        SystemDataStreamDescriptor descriptor = new ContextEnginePlugin(Settings.EMPTY).getSystemDataStreamDescriptors()
+            .stream()
+            .filter(d -> d.getDataStreamName().equals(ContextEnginePlugin.SESSION_MEMORY_DATA_STREAM_NAME))
+            .findFirst()
+            .orElseThrow();
         assertThat(
-            new ContextEnginePlugin(Settings.EMPTY).getSettings(),
-            hasItem(ContextEnginePlugin.SESSION_MEMORY_REDACTION_INFERENCE_ID)
+            descriptor.getComposableIndexTemplate().template().settings().get("index.default_pipeline"),
+            equalTo(SessionMemoryPipelineRegistry.PIPELINE_NAME)
         );
+    }
+
+    public void testProcessors() {
+        ThreadPool threadPool = new TestThreadPool(getTestName());
+        try {
+            Map<String, Processor.Factory> processors = new ContextEnginePlugin(Settings.EMPTY).getProcessors(
+                new Processor.Parameters(null, null, null, null, null, null, null, new NoOpClient(threadPool), null, null, null, null)
+            );
+            assertThat(processors.keySet(), containsInAnyOrder(ExtractProcessor.TYPE, SessionMemoryInputsProcessor.TYPE));
+        } finally {
+            terminate(threadPool);
+        }
     }
 
     public void testSessionMemoryExtractionInferenceId() {
