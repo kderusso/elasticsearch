@@ -38,7 +38,7 @@ public class RememberActionRequestTests extends AbstractWireSerializingTestCase<
     }
 
     public void testValidateValidRequest() {
-        SessionMemory memory = SessionMemoryTestUtils.randomSessionMemory().withIdAndTimestamp(null, null);
+        SessionMemory memory = SessionMemoryTestUtils.randomSessionMemory().withIdAndTimestamp(null, null).withExtractedContent(null);
         assertThat(new RememberAction.Request(memory).validate(), nullValue());
     }
 
@@ -98,5 +98,12 @@ public class RememberActionRequestTests extends AbstractWireSerializingTestCase<
         ActionRequestValidationException e = new RememberAction.Request(memory).validate();
         assertThat(e, notNullValue());
         assertThat(e.getMessage(), containsString("[@timestamp] is set at write time"));
+    }
+
+    public void testValidateRejectsExtractedContent() {
+        SessionMemory memory = SessionMemoryTestUtils.randomSessionMemory().withIdAndTimestamp(null, null).withExtractedContent("text");
+        ActionRequestValidationException e = new RememberAction.Request(memory).validate();
+        assertThat(e, notNullValue());
+        assertThat(e.getMessage(), containsString("[extracted_content] is set at write time"));
     }
 }

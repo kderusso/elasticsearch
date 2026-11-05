@@ -20,6 +20,7 @@ import static org.elasticsearch.xpack.core.ClientHelper.CONTEXT_ENGINE_ORIGIN;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 
@@ -64,6 +65,32 @@ public class ContextEnginePluginTests extends ESTestCase {
             .string();
         assertThat(mappings, containsString("\"inference_id\":\"" + inferenceId + "\""));
         assertThat(mappings, not(containsString("${")));
+    }
+
+    public void testSessionMemoryRedactionInferenceId() {
+        assertThat(ContextEnginePlugin.SESSION_MEMORY_REDACTION_INFERENCE_ID.get(Settings.EMPTY), equalTo(".rainbow-sprinkles-elastic"));
+        assertThat(
+            new ContextEnginePlugin(Settings.EMPTY).getSettings(),
+            hasItem(ContextEnginePlugin.SESSION_MEMORY_REDACTION_INFERENCE_ID)
+        );
+    }
+
+    public void testSessionMemoryExtractionInferenceId() {
+        assertThat(ContextEnginePlugin.SESSION_MEMORY_EXTRACTION_INFERENCE_ID.get(Settings.EMPTY), equalTo(".jina-reader"));
+        assertThat(
+            new ContextEnginePlugin(Settings.EMPTY).getSettings(),
+            hasItem(ContextEnginePlugin.SESSION_MEMORY_EXTRACTION_INFERENCE_ID)
+        );
+    }
+
+    public void testSessionMemoryExtractionEnabled() {
+        assertThat(ContextEnginePlugin.SESSION_MEMORY_EXTRACTION_ENABLED.get(Settings.EMPTY), equalTo(true));
+        assertThat(new ContextEnginePlugin(Settings.EMPTY).getSettings(), hasItem(ContextEnginePlugin.SESSION_MEMORY_EXTRACTION_ENABLED));
+    }
+
+    public void testSessionMemoryRedactionEnabled() {
+        assertThat(ContextEnginePlugin.SESSION_MEMORY_REDACTION_ENABLED.get(Settings.EMPTY), equalTo(true));
+        assertThat(new ContextEnginePlugin(Settings.EMPTY).getSettings(), hasItem(ContextEnginePlugin.SESSION_MEMORY_REDACTION_ENABLED));
     }
 
     public void testFeatureRegistersWithoutOverlap() {
